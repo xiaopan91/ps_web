@@ -7,6 +7,15 @@
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <style>
     body { background: #f5f6f8; }
+    /* 导航链接：可点击观感（圆角底 + 悬停高亮） */
+    .navbar .app-nav {
+      padding: 0.4rem 0.9rem; border-radius: 0.375rem;
+      color: rgba(255,255,255,.65); text-decoration: none; font-size: 1rem;
+      transition: background .15s, color .15s;
+    }
+    .navbar .app-nav:hover { background: rgba(255,255,255,.14); color: #fff; }
+    .navbar .navbar-brand { border-radius: 0.375rem; transition: background .15s; }
+    .navbar .navbar-brand:hover { background: rgba(255,255,255,.14); }
     .up { color: #ef4444; }
     .down { color: #22c55e; }
     .card { border: none; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
@@ -21,9 +30,9 @@
   <div id="app">
     <nav class="navbar navbar-dark bg-dark">
       <div class="container-fluid d-flex align-items-center">
-        <div class="d-flex align-items-center">
+        <div class="d-flex align-items-center gap-2">
           <a class="navbar-brand mb-0 h1" href="/">首页</a>
-          <a class="nav-link text-white-50" href="/stock">个股行情</a>
+          <a class="app-nav" href="/stock">个股行情</a>
         </div>
       </div>
     </nav>

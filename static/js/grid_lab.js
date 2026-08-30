@@ -1,5 +1,5 @@
 // 网格交易实验室：参数表单 → 回测 API → 指标卡 + 净值曲线 + 交易明细
-const { createApp, computed, onMounted, ref } = Vue;
+const { createApp, computed, nextTick, onMounted, ref } = Vue;
 
 const app = createApp({
   setup() {
@@ -26,7 +26,9 @@ const app = createApp({
     function render() {
       const r = result.value;
       if (!r) return;
-      if (!chart) chart = echarts.init(document.getElementById("chart"));
+      const el = document.getElementById("chart");
+      if (!el) return;  // v-if 尚未渲染（防御）
+      if (!chart) chart = echarts.init(el);
       chart.setOption({
         animation: false,
         tooltip: { trigger: "axis" },
@@ -65,6 +67,7 @@ const app = createApp({
           n: nGrids.value, cash: cash.value,
         });
         history.replaceState(null, "", `/strategy/grid?${u}`);
+        await nextTick();  // 等 v-if 的图表容器进入 DOM
         render();
       } catch (e) {
         error.value = e.message;

@@ -90,18 +90,26 @@ const app = createApp({
       if (!l) return [];
       const fs = l.factors || {};
       const defs = [
-        ["breadth", `${l.up} 涨 / ${l.down} 跌`],
-        ["limit_up", `${l.limit_up ?? '—'} 家（跌停 ${l.limit_down ?? '—'}）`],
-        ["max_streak", l.max_streak != null ? `${l.max_streak} 连板` : "—"],
-        ["amount_ratio", `量比 ${l.amount_ratio ?? '—'}`],
-        ["avg_turnover_f", `成交 ${l.total_amount_yi ? (l.total_amount_yi/10000).toFixed(2) : '—'} 万亿`],
-        ["margin_net_buy", `两融余额 ${l.margin_balance_yi ?? '—'} 亿`],
-        ["north_net", `北向 ${l.north_net_yi != null ? (l.north_net_yi>0?'+':'')+l.north_net_yi : '—'} 亿`],
-        ["std_pct", `中位涨跌 ${l.median_pct != null ? (l.median_pct>0?'+':'')+l.median_pct+'%' : '—'}`],
+        ["breadth", `${l.up} 涨 / ${l.down} 跌`,
+         "涨跌比：上涨家数÷下跌家数，衡量市场普涨普跌的广度，越高情绪越暖"],
+        ["limit_up", `${l.limit_up ?? '—'} 家（跌停 ${l.limit_down ?? '—'}）`,
+         "涨停家数：当日封死涨停的股票数（自算阈值：主板10%/创业板科创板20%/北交所30%/ST 5%），短线情绪的核心温度计"],
+        ["max_streak", l.max_streak != null ? `${l.max_streak} 连板` : "—",
+         "连板高度：当日最高的连续涨停天数（空间板），越高说明短线情绪越亢奋、题材越疯狂"],
+        ["amount_ratio", `量比 ${l.amount_ratio ?? '—'}`,
+         "量能比：5日平均成交额÷20日平均成交额，大于1为放量，小于1为缩量；量是情绪的燃料"],
+        ["avg_turnover_f", `成交 ${l.total_amount_yi ? (l.total_amount_yi/10000).toFixed(2) : '—'} 万亿`,
+         "换手率：全市场流通盘换手率均值，衡量交投活跃度（卡片显示当日总成交额）"],
+        ["margin_net_buy", `两融余额 ${l.margin_balance_yi ?? '—'} 亿`,
+         "两融净买入：融资买入额减偿还额（杠杆资金当日净流入），余额为其存量；杠杆加得越猛情绪越高"],
+        ["north_net", `北向 ${l.north_net_yi != null ? (l.north_net_yi>0?'+':'')+l.north_net_yi : '—'} 亿`,
+         "北向净买：沪深股通（外资）当日净买入金额，代表外资方向"],
+        ["std_pct", `中位涨跌 ${l.median_pct != null ? (l.median_pct>0?'+':'')+l.median_pct+'%' : '—'}`,
+         "离散度(反)：当日全市场个股涨跌幅的标准差，越大说明个股表现分化越严重、市场分歧越大；反向计入分数（分歧大→扣分）"],
       ];
-      return defs.map(([key, value]) => {
+      return defs.map(([key, value, tip]) => {
         const pct = fs[key] ?? null;
-        return { key, label: FACTOR_LABELS[key] || key, value, pct,
+        return { key, label: FACTOR_LABELS[key] || key, value, pct, tip,
                  color: pct == null ? GRAY : (pct >= 60 ? UP : pct >= 40 ? "#64748b" : DOWN) };
       });
     });

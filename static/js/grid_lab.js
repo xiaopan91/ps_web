@@ -22,10 +22,73 @@ const app = createApp({
     const pct = v => (v * 100).toFixed(2) + "%";
 
     let chart = null;
+    let chartPrice = null;
+
+    function renderPrice() {
+      const r = result.value;
+      if (!r) return;
+      const el = document.getElementById("chart-price");
+      if (!el) return;
+      if (!chartPrice) chartPrice = echarts.init(el);
+
+      const { dates, prices, adj, base_hfq, grid_pct, grid_jrange, trades } = r;
+      const g = grid_pct / 100;
+      // 每条格线的原始价格序列（除权日跳变，符合实际网格重划）
+      const gridSeries = [];
+      for (let j = grid_jrange[0]; j <= grid_jrange[1]; j++) {
+        gridSeries.push({
+          type: "line",
+          data: adj.map(a => +(base_hfq * Math.pow(1 + g, j) / a).toFixed(4)),
+          showSymbol: false, silent: true, z: 1,
+          lineStyle: { width: 0.8, type: "dashed", color: "#cbd5e1" },
+          itemStyle: { color: "#cbd5e1" },
+        });
+      }
+      const buys = trades.filter(t => t.side === "买");
+      const sells = trades.filter(t => t.side === "卖");
+
+      chartPrice.setOption({
+        animation: false,
+        tooltip: {
+          trigger: "axis",
+          formatter: params => {
+            let out = `<b>${params[0].axisValue}</b>`;
+            for (const p of params) {
+              if (p.seriesName === "价格") out += `<br/>价格 ${p.value}`;
+              else if (p.seriesName === "买入")
+                out += `<br/><span style="color:#ef4444">▲ 买入 ${Number(p.value[2]).toLocaleString()} 份 @ ${p.value[1]}</span>`;
+              else if (p.seriesName === "卖出")
+                out += `<br/><span style="color:#22c55e">▼ 卖出 ${Number(p.value[2]).toLocaleString()} 份 @ ${p.value[1]}</span>`
+                     + (p.value[3] != null ? `（盈亏 ${p.value[3]}）` : "");
+            }
+            return out;
+          },
+        },
+        legend: { data: ["价格", "买入", "卖出"], top: 0 },
+        grid: { left: 60, right: 20, top: 30, bottom: 48 },
+        dataZoom: [{ type: "inside" }, { type: "slider", height: 18, bottom: 8 }],
+        xAxis: { type: "category", data: dates, boundaryGap: false },
+        yAxis: { scale: true },
+        series: [
+          { name: "价格", type: "line", data: prices, showSymbol: false, z: 3,
+            lineStyle: { width: 1.6, color: "#334155" }, itemStyle: { color: "#334155" } },
+          ...gridSeries,
+          { name: "买入", type: "scatter", z: 5,
+            data: buys.map(t => [t.date, t.price, t.qty]),
+            symbol: "triangle", symbolSize: 10,
+            itemStyle: { color: "#ef4444" } },
+          { name: "卖出", type: "scatter", z: 5,
+            data: sells.map(t => [t.date, t.price, t.qty, t.pnl]),
+            symbol: "triangle", symbolRotate: 180, symbolSize: 10,
+            itemStyle: { color: "#22c55e" } },
+        ],
+      }, true);
+    }
 
     function render() {
       const r = result.value;
       if (!r) return;
+      renderPrice();
       const el = document.getElementById("chart");
       if (!el) return;  // v-if 尚未渲染（防御）
       if (!chart) chart = echarts.init(el);
@@ -85,7 +148,10 @@ const app = createApp({
         }
       } catch (e) { /* 标的列表失败不阻塞 */ }
       run();
-      window.addEventListener("resize", () => chart && chart.resize());
+      window.addEventListener("resize", () => {
+        chart && chart.resize();
+        chartPrice && chartPrice.resize();
+      });
     });
 
     return { targets, code, start, gridPct, nGrids, cash, result, m, trades,

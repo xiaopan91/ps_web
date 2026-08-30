@@ -123,10 +123,20 @@ class GridBacktest:
         sells = tdf[tdf["side"] == "卖"] if not tdf.empty else tdf
         wins = int((sells["pnl"] > 0).sum()) if not sells.empty else 0
 
+        # 网格线绘制范围：名义网格 ±N，外扩覆盖价格实际区间（限 ±40 防线太密）
+        jlo = min(-self.n, self.grid_pos(df["px"].min()) - 1)
+        jhi = max(self.n, self.grid_pos(df["px"].max()) + 1)
+        jlo, jhi = max(jlo, -40), min(jhi, 40)
+
         return {
             "dates": dates,
             "equity": [round(v, 2) for v in eq],
             "bh": [round(v, 2) for v in bh],
+            "prices": [round(v, 4) for v in df["close"].astype(float)],
+            "adj": [round(v, 6) for v in df["adj_factor"]],
+            "base_hfq": self.base,
+            "grid_pct": self.g * 100,
+            "grid_jrange": [jlo, jhi],
             "trades": trades,
             "metrics": {
                 "total_ret": eq.iloc[-1] / self.cash0 - 1,

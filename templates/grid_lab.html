@@ -12,7 +12,8 @@
     .down { color: #22c55e; }
     .metric-card { border: none; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
     .metric-val { font-size: 1.5rem; font-weight: 700; }
-    #chart { width: 100%; height: 380px; }
+    #chart { width: 100%; height: 300px; }
+    #chart-price { width: 100%; height: 460px; }
     .trades-box { max-height: 360px; overflow-y: auto; }
   </style>
 </head>
@@ -97,6 +98,15 @@
           <div class="metric-val">{{ m.win_rate == null ? '—' : (m.win_rate*100).toFixed(0) + '%' }}</div>
         </div></div></div>
       </div>
+
+      <!-- 价格 + 网格线 + 交易点 -->
+      <div class="card mb-3" v-if="result"><div class="card-body">
+        <h6 class="card-title mb-3">
+          价格 × 网格线 × 交易点
+          <span class="text-muted small fw-normal">（▲ 红=买入 ▼ 绿=卖出，虚线为格线）</span>
+        </h6>
+        <div id="chart-price"></div>
+      </div></div>
 
       <!-- 净值曲线 -->
       <div class="card mb-3" v-if="result"><div class="card-body">

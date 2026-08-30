@@ -74,6 +74,21 @@ NSSM Windows 服务 `ps_web`（开机自启、崩溃 5 秒自动拉起）：
 
 改完代码发布：开发目录 `git push` → 生产目录 `prod.bat` 选 `[8]`。
 
+## 行情数据同步（tushare）
+
+数据源：tushare（token 填在 `.env` 的 `TUSHARE_TOKEN`）。全市场 A 股日线 + 复权因子 + 交易日历，
+按交易日批量拉取（一次调用返回全市场当天约 5500 只）。
+
+```bash
+python scripts/sync_data.py cal                        # 交易日历（首次必跑，一次性）
+python scripts/sync_data.py backfill --start 20160101  # 回补历史（10年约2小时）
+python scripts/sync_data.py update                     # 每日增量（收盘后跑）
+```
+
+- 幂等：按日先删后插，重跑无害；接口限流自动重试等待
+- 校验：逐日落库行数与接口返回行数比对，不符告警
+- 表：`daily_bar`（日线）、`adj_factor`（复权因子）、`trade_cal`（交易日历）
+
 ## 数据库初始化（新机器/新库时）
 
 1. 复制 `.env.example` 为 `.env`，填写 `DB_PASSWORD` 和临时 `MYSQL_ROOT_PASSWORD`

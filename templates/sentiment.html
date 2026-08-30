@@ -32,6 +32,11 @@
       border-color: rgba(255,255,255,.38);
       transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.35);
     }
+    .navbar .app-nav.active {
+      color: #fff; background: rgba(255,255,255,.16);
+      border-color: rgba(255,255,255,.38);
+    }
+    .navbar .app-nav.active::before { opacity: 1; background: #60a5fa; }
     .up { color: #ef4444; }
     .down { color: #22c55e; }
     .card { border: none; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
@@ -49,6 +54,7 @@
         <div class="d-flex align-items-center gap-3">
           <a class="navbar-brand mb-0 h1" href="/">首页</a>
           <a class="app-nav" href="/stock">个股行情</a>
+          <a class="app-nav active" href="/sentiment">市场情绪</a>
         </div>
       </div>
     </nav>

@@ -54,3 +54,15 @@
   transform: translateY(-1px);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
+
+/* 当前页：选中态（高亮底 + 亮色圆点） */
+.navbar .app-nav.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.38);
+}
+
+.navbar .app-nav.active::before {
+  opacity: 1;
+  background: #60a5fa;
+}

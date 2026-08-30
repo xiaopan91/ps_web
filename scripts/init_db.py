@@ -31,15 +31,17 @@ try:
             f"CREATE DATABASE IF NOT EXISTS `{DB_NAME}` "
             "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
         )
-        cur.execute(
-            f"CREATE USER IF NOT EXISTS '{DB_USER}'@'localhost' IDENTIFIED BY %s",
-            (APP_PASSWORD,),
-        )
-        # 重复运行时同步密码
-        cur.execute(
-            f"ALTER USER '{DB_USER}'@'localhost' IDENTIFIED BY %s", (APP_PASSWORD,)
-        )
-        cur.execute(f"GRANT ALL PRIVILEGES ON `{DB_NAME}`.* TO '{DB_USER}'@'localhost'")
+        # localhost 和 127.0.0.1 各建一份，兼容服务端域名解析开关的两种状态
+        for host in ("localhost", "127.0.0.1"):
+            cur.execute(
+                f"CREATE USER IF NOT EXISTS '{DB_USER}'@'{host}' IDENTIFIED BY %s",
+                (APP_PASSWORD,),
+            )
+            # 重复运行时同步密码
+            cur.execute(
+                f"ALTER USER '{DB_USER}'@'{host}' IDENTIFIED BY %s", (APP_PASSWORD,)
+            )
+            cur.execute(f"GRANT ALL PRIVILEGES ON `{DB_NAME}`.* TO '{DB_USER}'@'{host}'")
         cur.execute("FLUSH PRIVILEGES")
     conn.commit()
     print(f"完成：数据库 {DB_NAME} 与账号 {DB_USER} 已就绪")

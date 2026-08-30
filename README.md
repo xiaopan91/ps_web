@@ -67,11 +67,31 @@ python -m venv .venv
 
 3. **访问**
 
-   - 页面：http://127.0.0.1:8000
-   - API 文档：http://127.0.0.1:8000/docs
-   - 健康检查：http://127.0.0.1:8000/api/health
+   - 页面：http://127.0.0.1:8001
+   - API 文档：http://127.0.0.1:8001/docs
+   - 健康检查：http://127.0.0.1:8001/api/health
 
-改代码自动热重载（`--reload` 已开）。
+改代码自动热重载（`--reload` 已开）。开发用 8001，生产服务常驻 8000，互不冲突。
+
+## 生产部署（NSSM Windows 服务）
+
+生产入口 `run_prod.py`（0.0.0.0:8000、无 reload、无颜色码）。已注册为 Windows 服务 `ps_web`：
+
+- **开机自启**（不需要登录），崩溃后 5 秒自动拉起
+- 日志：`logs/service.log`（10MB 自动轮转）
+- 局域网内其他设备可通过 `http://<本机IP>:8000` 访问
+
+常用命令（管理员终端）：
+
+```bat
+sc query ps_web                 :: 查看状态
+nssm restart ps_web             :: 重启（改完生产代码后）
+nssm stop ps_web                :: 停止
+nssm start ps_web               :: 启动
+scripts\uninstall_service.bat   :: 卸载服务（含防火墙规则）
+```
+
+重新安装服务：右键「以管理员身份运行」`scripts\install_service.bat`（首次安装需先把 nssm.exe 放到 `tools\` 下）。
 
 ## 数据库初始化（只需一次）
 

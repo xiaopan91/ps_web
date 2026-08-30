@@ -36,19 +36,19 @@ if errorlevel 1 (
 )
 
 rem ---- 3. already running? just open browser ----
-netstat -ano | findstr :8000 | findstr LISTENING >nul 2>&1
+netstat -ano | findstr :8001 | findstr LISTENING >nul 2>&1
 if not errorlevel 1 (
-    echo [INFO] port 8000 already in use, opening browser only
-    start http://127.0.0.1:8000
+    echo [INFO] port 8001 already in use, opening browser only
+    start http://127.0.0.1:8001
     %SystemRoot%\System32\timeout.exe /t 2 >nul
     exit /b 0
 )
 
 rem ---- 4. background helper: open browser once server is reachable ----
-start "" /min powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 40;$i++){try{$c=New-Object Net.Sockets.TcpClient;$c.Connect('127.0.0.1',8000);$c.Close();Start-Process 'http://127.0.0.1:8000';break}catch{Start-Sleep 1}}"
+start "" /min powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 40;$i++){try{$c=New-Object Net.Sockets.TcpClient;$c.Connect('127.0.0.1',8001);$c.Close();Start-Process 'http://127.0.0.1:8001';break}catch{Start-Sleep 1}}"
 
 rem ---- 5. start dev server in foreground (this window = log window, Ctrl+C to stop) ----
-echo [OK] starting dev server: http://127.0.0.1:8000
+echo [OK] starting dev server: http://127.0.0.1:8001
 ".venv\Scripts\python.exe" run.py
 
 echo.

@@ -22,14 +22,13 @@ const app = createApp({
     const pct = v => (v * 100).toFixed(2) + "%";
 
     let chart = null;
-    let chartPrice = null;
 
-    function renderPrice() {
+    function render() {
       const r = result.value;
       if (!r) return;
-      const el = document.getElementById("chart-price");
-      if (!el) return;
-      if (!chartPrice) chartPrice = echarts.init(el);
+      const el = document.getElementById("chart");
+      if (!el) return;  // v-if 尚未渲染（防御）
+      if (!chart) chart = echarts.init(el);
 
       const { dates, prices, adj, base_hfq, grid_pct, grid_jrange, trades } = r;
       const g = grid_pct / 100;
@@ -37,7 +36,7 @@ const app = createApp({
       const gridSeries = [];
       for (let j = grid_jrange[0]; j <= grid_jrange[1]; j++) {
         gridSeries.push({
-          type: "line",
+          type: "line", xAxisIndex: 0, yAxisIndex: 0,
           data: adj.map(a => +(base_hfq * Math.pow(1 + g, j) / a).toFixed(4)),
           showSymbol: false, silent: true, z: 1,
           lineStyle: { width: 0.8, type: "dashed", color: "#cbd5e1" },
@@ -47,8 +46,9 @@ const app = createApp({
       const buys = trades.filter(t => t.side === "买");
       const sells = trades.filter(t => t.side === "卖");
 
-      chartPrice.setOption({
+      chart.setOption({
         animation: false,
+        axisPointer: { link: [{ xAxisIndex: "all" }] },
         tooltip: {
           trigger: "axis",
           formatter: params => {
@@ -60,38 +60,56 @@ const app = createApp({
               else if (p.seriesName === "卖出")
                 out += `<br/><span style="color:#22c55e">▼ 卖出 ${Number(p.value[2]).toLocaleString()} 份 @ ${p.value[1]}</span>`
                      + (p.value[3] != null ? `（盈亏 ${p.value[3]}）` : "");
+              else if (p.seriesName === "网格净值")
+                out += `<br/>网格净值 ${(p.value / 10000).toFixed(2)}万`;
+              else if (p.seriesName === "买入持有")
+                out += `<br/>持有净值 ${(p.value / 10000).toFixed(2)}万`;
             }
             return out;
           },
         },
-        legend: { data: ["价格", "买入", "卖出"], top: 0 },
-        grid: { left: 60, right: 20, top: 30, bottom: 48 },
-        dataZoom: [{ type: "inside" }, { type: "slider", height: 18, bottom: 8 }],
-        xAxis: { type: "category", data: dates, boundaryGap: false },
-        yAxis: { scale: true },
+        legend: { data: ["价格", "买入", "卖出", "网格净值", "买入持有"], top: 0 },
+        grid: [
+          { left: 60, right: 20, top: 32, height: "50%" },
+          { left: 60, right: 20, top: "68%", height: "20%" },
+        ],
+        xAxis: [
+          { type: "category", data: dates, boundaryGap: false,
+            axisLabel: { show: false } },
+          { type: "category", gridIndex: 1, data: dates, boundaryGap: false },
+        ],
+        yAxis: [
+          { scale: true },
+          { gridIndex: 1, scale: true,
+            axisLabel: { formatter: v => (v / 10000).toFixed(1) + "万" },
+            splitLine: { show: false } },
+        ],
+        dataZoom: [
+          { type: "inside", xAxisIndex: [0, 1] },
+          { type: "slider", xAxisIndex: [0, 1], height: 18, bottom: 8 },
+        ],
         series: [
-          { name: "价格", type: "line", data: prices, showSymbol: false, z: 3,
+          { name: "价格", type: "line", xAxisIndex: 0, yAxisIndex: 0,
+            data: prices, showSymbol: false, z: 3,
             lineStyle: { width: 1.6, color: "#334155" }, itemStyle: { color: "#334155" } },
           ...gridSeries,
-          { name: "买入", type: "scatter", z: 5,
+          { name: "买入", type: "scatter", xAxisIndex: 0, yAxisIndex: 0, z: 5,
             data: buys.map(t => [t.date, t.price, t.qty]),
             symbol: "triangle", symbolSize: 10,
             itemStyle: { color: "#ef4444" } },
-          { name: "卖出", type: "scatter", z: 5,
+          { name: "卖出", type: "scatter", xAxisIndex: 0, yAxisIndex: 0, z: 5,
             data: sells.map(t => [t.date, t.price, t.qty, t.pnl]),
             symbol: "triangle", symbolRotate: 180, symbolSize: 10,
             itemStyle: { color: "#22c55e" } },
+          { name: "网格净值", type: "line", xAxisIndex: 1, yAxisIndex: 1,
+            data: r.equity, showSymbol: false,
+            lineStyle: { width: 2, color: "#3b82f6" }, itemStyle: { color: "#3b82f6" } },
+          { name: "买入持有", type: "line", xAxisIndex: 1, yAxisIndex: 1,
+            data: r.bh, showSymbol: false,
+            lineStyle: { width: 1, color: "#94a3b8" }, itemStyle: { color: "#94a3b8" } },
         ],
       }, true);
     }
-
-    function render() {
-      const r = result.value;
-      if (!r) return;
-      renderPrice();
-      const el = document.getElementById("chart");
-      if (!el) return;  // v-if 尚未渲染（防御）
-      if (!chart) chart = echarts.init(el);
       chart.setOption({
         animation: false,
         tooltip: { trigger: "axis" },
@@ -148,10 +166,7 @@ const app = createApp({
         }
       } catch (e) { /* 标的列表失败不阻塞 */ }
       run();
-      window.addEventListener("resize", () => {
-        chart && chart.resize();
-        chartPrice && chartPrice.resize();
-      });
+      window.addEventListener("resize", () => chart && chart.resize());
     });
 
     return { targets, code, start, gridPct, nGrids, cash, result, m, trades,

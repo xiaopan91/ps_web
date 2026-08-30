@@ -91,6 +91,9 @@ nssm start ps_web               :: 启动
 scripts\uninstall_service.bat   :: 卸载服务（含防火墙规则）
 ```
 
+也可以直接**双击 `prod.bat`**：图形菜单一站式管理（看状态/启停/重启/看日志/健康检查/开页面），
+其中启停重启会自动弹一次 UAC，其余操作无需管理员权限。
+
 重新安装服务：右键「以管理员身份运行」`scripts\install_service.bat`（首次安装需先把 nssm.exe 放到 `tools\` 下）。
 
 ## 数据库初始化（只需一次）

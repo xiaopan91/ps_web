@@ -7,15 +7,31 @@
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <style>
     body { background: #f5f6f8; }
-    /* 导航链接：可点击观感（圆角底 + 悬停高亮） */
-    .navbar .app-nav {
-      padding: 0.4rem 0.9rem; border-radius: 0.375rem;
-      color: rgba(255,255,255,.65); text-decoration: none; font-size: 1rem;
-      transition: background .15s, color .15s;
+    /* 导航链接：玻璃拟态胶囊（与 style.css 保持一致） */
+    .navbar { padding: 0.65rem 0; }
+    .navbar .navbar-brand {
+      font-size: 1.5rem; font-weight: 700; padding: 0.4rem 1rem;
+      border-radius: 999px; transition: all .18s ease;
     }
-    .navbar .app-nav:hover { background: rgba(255,255,255,.14); color: #fff; }
-    .navbar .navbar-brand { border-radius: 0.375rem; transition: background .15s; }
-    .navbar .navbar-brand:hover { background: rgba(255,255,255,.14); }
+    .navbar .navbar-brand:hover {
+      background: rgba(255,255,255,.12); box-shadow: 0 4px 14px rgba(0,0,0,.3);
+    }
+    .navbar .app-nav {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.55rem 1.25rem; border-radius: 999px;
+      font-size: 1.05rem; font-weight: 500; color: rgba(255,255,255,.78);
+      background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14);
+      text-decoration: none; transition: all .18s ease;
+    }
+    .navbar .app-nav::before {
+      content: ""; width: 7px; height: 7px; border-radius: 50%;
+      background: currentColor; opacity: .55; flex: none;
+    }
+    .navbar .app-nav:hover {
+      color: #fff; background: rgba(255,255,255,.16);
+      border-color: rgba(255,255,255,.38);
+      transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.35);
+    }
     .up { color: #ef4444; }
     .down { color: #22c55e; }
     .card { border: none; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
@@ -30,7 +46,7 @@
   <div id="app">
     <nav class="navbar navbar-dark bg-dark">
       <div class="container-fluid d-flex align-items-center">
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-3">
           <a class="navbar-brand mb-0 h1" href="/">首页</a>
           <a class="app-nav" href="/stock">个股行情</a>
         </div>
@@ -65,7 +81,7 @@
       </div>
 
       <!-- 区间切换 -->
-      <div class="d-flex align-items-center gap-2 mb-3">
+      <div class="d-flex align-items-center gap-3 mb-3">
         <div class="btn-group btn-group-sm">
           <button v-for="d in dayOptions" :key="d.k" class="btn" type="button"
                   :class="days === d.k ? 'btn-primary' : 'btn-outline-primary'"

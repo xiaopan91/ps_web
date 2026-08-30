@@ -110,23 +110,6 @@ const app = createApp({
         ],
       }, true);
     }
-      chart.setOption({
-        animation: false,
-        tooltip: { trigger: "axis" },
-        legend: { data: ["网格净值", "买入持有"], top: 0 },
-        grid: { left: 60, right: 20, top: 32, bottom: 46 },
-        dataZoom: [{ type: "inside" }, { type: "slider", height: 18, bottom: 8 }],
-        xAxis: { type: "category", data: r.dates, boundaryGap: false },
-        yAxis: { scale: true, axisLabel: { formatter: v => (v / 10000).toFixed(1) + "万" } },
-        series: [
-          { name: "网格净值", type: "line", data: r.equity, showSymbol: false,
-            lineStyle: { width: 2, color: "#3b82f6" }, itemStyle: { color: "#3b82f6" },
-            areaStyle: { opacity: 0.06 } },
-          { name: "买入持有", type: "line", data: r.bh, showSymbol: false,
-            lineStyle: { width: 1, color: "#94a3b8" }, itemStyle: { color: "#94a3b8" } },
-        ],
-      }, true);
-    }
 
     async function run() {
       loading.value = true;

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>市场情绪 · ps_web</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
+  <style>
+    body { background: #f5f6f8; }
+    .up { color: #ef4444; }
+    .down { color: #22c55e; }
+    .card { border: none; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .score-big { font-size: 3.2rem; font-weight: 700; line-height: 1; }
+    .factor-bar { height: 5px; border-radius: 3px; background: #e9ecef; }
+    .factor-bar > div { height: 100%; border-radius: 3px; }
+    .chart { width: 100%; height: 300px; }
+    .chart-tall { width: 100%; height: 340px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <nav class="navbar navbar-dark bg-dark">
+      <div class="container-fluid">
+        <span class="navbar-brand mb-0 h1">ps_web</span>
+        <div class="d-flex gap-3">
+          <a class="nav-link text-white-50" href="/">首页</a>
+          <a class="nav-link text-white-50" href="/stock">个股行情</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container my-3">
+      <!-- 指标卡片区 -->
+      <div class="row g-3 mb-3">
+        <div class="col-md-3">
+          <div class="card h-100"><div class="card-body text-center">
+            <div class="text-muted small">市场情绪分（0-100）</div>
+            <div class="score-big" :style="{color: scoreColor}">{{ latest ? latest.score : '—' }}</div>
+            <div class="mt-1" :style="{color: scoreColor}">{{ zoneLabel }}</div>
+            <div class="text-muted small mt-1">{{ latest ? latest.trade_date : '' }}</div>
+          </div></div>
+        </div>
+        <div class="col-md-9">
+          <div class="card h-100"><div class="card-body">
+            <div class="row row-cols-2 row-cols-md-4 g-3">
+              <div class="col" v-for="f in factorCards" :key="f.key">
+                <div class="d-flex justify-content-between">
+                  <span class="text-muted small">{{ f.label }}</span>
+                  <span class="small" :style="{color: f.color}">{{ f.pct == null ? '—' : f.pct }}</span>
+                </div>
+                <div class="fw-bold">{{ f.value }}</div>
+                <div class="factor-bar mt-1"><div :style="{width: (f.pct||0)+'%', background: f.color}"></div></div>
+              </div>
+            </div>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- 区间切换 -->
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <div class="btn-group btn-group-sm">
+          <button v-for="d in dayOptions" :key="d.k" class="btn" type="button"
+                  :class="days === d.k ? 'btn-primary' : 'btn-outline-primary'"
+                  @click="days = d.k">{{ d.label }}</button>
+        </div>
+        <span class="text-muted small" v-if="loading">加载中…</span>
+        <span class="text-danger small" v-if="error">{{ error }}</span>
+      </div>
+
+      <!-- 图表区 -->
+      <div class="row g-3">
+        <div class="col-12"><div class="card"><div class="card-body">
+          <h6 class="card-title mb-3">情绪分 × 上证指数</h6>
+          <div id="chart-score" class="chart-tall"></div>
+        </div></div></div>
+        <div class="col-lg-6"><div class="card"><div class="card-body">
+          <h6 class="card-title mb-3">涨跌家数</h6>
+          <div id="chart-breadth" class="chart"></div>
+        </div></div></div>
+        <div class="col-lg-6"><div class="card"><div class="card-body">
+          <h6 class="card-title mb-3">涨停家数 × 最高连板</h6>
+          <div id="chart-limit" class="chart"></div>
+        </div></div></div>
+        <div class="col-lg-6"><div class="card"><div class="card-body">
+          <h6 class="card-title mb-3">两市总成交额（亿元）</h6>
+          <div id="chart-amount" class="chart"></div>
+        </div></div></div>
+        <div class="col-lg-6"><div class="card"><div class="card-body">
+          <h6 class="card-title mb-3">两融余额 × 北向净买</h6>
+          <div id="chart-margin" class="chart"></div>
+        </div></div></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/vendor/vue/vue.global.prod.js"></script>
+  <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="/static/vendor/echarts/echarts.min.js"></script>
+  <script src="/static/js/sentiment.js"></script>
+</body>
+</html>

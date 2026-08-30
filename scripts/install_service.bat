@@ -19,7 +19,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set PROJECT=D:\claude\ps_web
+set PROJECT=D:\deploy\ps_web
 set NSSM=%PROJECT%\tools\nssm.exe
 set PY=%PROJECT%\.venv\Scripts\python.exe
 

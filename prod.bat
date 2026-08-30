@@ -22,6 +22,7 @@ echo   [4] show last 50 log lines
 echo   [5] show last 200 log lines
 echo   [6] open app in browser
 echo   [7] health check
+echo   [8] deploy latest code  (git pull + restart, UAC)
 echo   [q] quit
 echo.
 set "CHOICE="
@@ -34,6 +35,7 @@ if "%CHOICE%"=="4" goto log50
 if "%CHOICE%"=="5" goto log200
 if "%CHOICE%"=="6" goto browser
 if "%CHOICE%"=="7" goto health
+if "%CHOICE%"=="8" goto deploy
 if /i "%CHOICE%"=="q" exit /b 0
 goto menu
 
@@ -75,6 +77,18 @@ goto :eof
 
 :browser
 start http://127.0.0.1:8000
+goto menu
+
+:deploy
+rem one-click release: pull latest code then restart service
+rem (run this in the PRODUCTION directory D:\deploy\ps_web)
+echo pulling latest code from GitHub ...
+git pull origin main
+echo.
+echo restarting service ...
+call :elevate restart
+echo done.
+pause
 goto menu
 
 :health

@@ -33,7 +33,8 @@ DEFAULT_ETFS = [
 
 class GridBacktest:
     def __init__(self, code, start, end=None, grid_pct=5.0, n_grids=10,
-                 cash=100000.0, fee_rate=2.5e-4, min_fee=5.0, stamp_tax=1e-3):
+                 cash=100000.0, fee_rate=2.5e-4, min_fee=5.0, stamp_tax=1e-3,
+                 initial_grids=None):
         self.code = code
         self.start = start
         self.end = end or "2099-12-31"
@@ -44,6 +45,10 @@ class GridBacktest:
         self.min_fee = min_fee
         self.stamp_tax = 0.0 if is_etf(code) else stamp_tax
         self.per_grid = cash / n_grids
+        # 底仓格数：默认半仓（n//2）；起始日按收盘价建仓占用上方槽位，
+        # 上涨逐格止盈、剩余现金作为下方格线子弹。0 = 空仓起步（旧行为）
+        self.initial = min(initial_grids if initial_grids is not None
+                           else max(n_grids // 2, 0), n_grids)
 
     def load(self):
         table = "fund_daily" if is_etf(self.code) else "daily_bar"
@@ -75,7 +80,22 @@ class GridBacktest:
         equity, dates = [], []
 
         prev_k = self.grid_pos(df["px"].iloc[0])
-        held = {}  # 格线序号 -> 该格买入份额
+        held = {}  # 格线序号 -> (份额, 实际买入价)
+
+        # 底仓：起始日按收盘价（=基准价）建 initial 格，占用槽位 0..initial-1
+        first = df.iloc[0]
+        for j in range(self.initial):
+            qty = self._grid_qty_at(self.base)
+            if qty <= 0 or cash < qty * self.base:
+                break
+            fee = max(qty * self.base * self.fee_rate, self.min_fee)
+            cash -= qty * self.base + fee
+            shares += qty
+            held[j] = (qty, self.base)
+            trades.append({"date": first["trade_date"], "side": "买",
+                           "price": round(float(first["close"]), 4),
+                           "qty": qty, "fee": round(fee, 2)})
+
         for _, row in df.iterrows():
             d, px, adj = row["trade_date"], row["px"], row["adj_factor"]
             k = self.grid_pos(px)
@@ -93,7 +113,7 @@ class GridBacktest:
                     fee = max(qty * line * self.fee_rate, self.min_fee)
                     cash -= qty * line + fee
                     shares += qty
-                    held[m] = qty
+                    held[m] = (qty, line)
                     trades.append({"date": d, "side": "买",
                                    "price": round(line / adj, 4),
                                    "qty": qty, "fee": round(fee, 2)})
@@ -102,9 +122,8 @@ class GridBacktest:
                     j = m - 1
                     if j not in held:
                         continue
-                    buy_line = self.base * (1 + self.g) ** j
+                    qty, buy_px = held.pop(j)
                     line = self.base * (1 + self.g) ** m
-                    qty = held.pop(j)
                     fee = max(qty * line * self.fee_rate, self.min_fee) \
                           + qty * line * self.stamp_tax
                     cash += qty * line - fee
@@ -112,7 +131,7 @@ class GridBacktest:
                     trades.append({"date": d, "side": "卖",
                                    "price": round(line / adj, 4),
                                    "qty": qty, "fee": round(fee, 2),
-                                   "pnl": round((line - buy_line) * qty, 2)})
+                                   "pnl": round((line - buy_px) * qty, 2)})
             prev_k = k
             equity.append(cash + shares * px)
             dates.append(d)

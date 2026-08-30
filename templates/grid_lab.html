@@ -60,6 +60,11 @@
                    min="2" max="50" style="width:80px;">
           </div>
           <div>
+            <label class="form-label small text-muted mb-1">底仓格数</label>
+            <input type="number" class="form-control form-control-sm" v-model.number="initialGrids"
+                   min="0" max="50" style="width:80px;">
+          </div>
+          <div>
             <label class="form-label small text-muted mb-1">初始资金</label>
             <input type="number" class="form-control form-control-sm" v-model.number="cash"
                    min="10000" step="10000" style="width:120px;">

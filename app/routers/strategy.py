@@ -21,12 +21,14 @@ def grid_backtest(
     grid_pct: float = Query(default=5.0, ge=0.5, le=50),
     n_grids: int = Query(default=10, ge=2, le=50),
     cash: float = Query(default=100000, gt=0),
+    initial_grids: int = Query(default=None, ge=0, le=50),
 ):
     """运行网格回测，返回净值曲线、指标与交易明细。"""
     start_iso = f"{start[:4]}-{start[4:6]}-{start[6:8]}"
     end_iso = f"{end[:4]}-{end[4:6]}-{end[6:8]}" if end else None
     try:
-        bt = GridBacktest(code, start_iso, end_iso, grid_pct, n_grids, cash)
+        bt = GridBacktest(code, start_iso, end_iso, grid_pct, n_grids, cash,
+                          initial_grids=initial_grids)
         return bt.run()
     except ValueError as exc:
         raise HTTPException(400, str(exc))

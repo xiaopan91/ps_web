@@ -33,6 +33,8 @@ def main():
     parser.add_argument("--end", default=None)
     parser.add_argument("--grid-pct", type=float, default=5.0, help="格距百分比")
     parser.add_argument("--n-grids", type=int, default=10, help="上下各几格")
+    parser.add_argument("--initial-grids", type=int, default=None,
+                        help="起始底仓格数（默认半仓 n//2，0=空仓起步）")
     parser.add_argument("--cash", type=float, default=100000)
     parser.add_argument("--scan", action="store_true", help="参数扫描热力图")
     parser.add_argument("--csv", default=None, help="交易明细输出 CSV 路径")
@@ -52,7 +54,7 @@ def main():
         return
 
     bt = GridBacktest(args.code, args.start, args.end, args.grid_pct,
-                      args.n_grids, args.cash)
+                      args.n_grids, args.cash, initial_grids=args.initial_grids)
     r = bt.run()
     report(bt, r)
     if args.csv and r["trades"]:

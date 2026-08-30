@@ -14,6 +14,9 @@ const app = createApp({
     const start = ref(p.get("start") || "2016-01-04");
     const gridPct = ref(parseFloat(p.get("pct")) || 5);
     const nGrids = ref(parseInt(p.get("n")) || 10);
+    const _init = p.has("init") ? parseInt(p.get("init")) : NaN;
+    const initialGrids = ref(Number.isNaN(_init)
+      ? Math.floor((parseInt(p.get("n")) || 10) / 2) : _init);
     const cash = ref(parseFloat(p.get("cash")) || 100000);
 
     const m = computed(() => result.value ? result.value.metrics : null);
@@ -112,6 +115,9 @@ const app = createApp({
           code: code.value, start: s,
           grid_pct: gridPct.value, n_grids: nGrids.value, cash: cash.value,
         });
+        if (initialGrids.value != null && !Number.isNaN(initialGrids.value)) {
+          qs.set("initial_grids", initialGrids.value);
+        }
         const res = await fetch(`/api/strategy/grid/backtest?${qs}`);
         if (!res.ok) {
           const msg = await res.json().catch(() => ({}));
@@ -122,6 +128,9 @@ const app = createApp({
           code: code.value, start: s, pct: gridPct.value,
           n: nGrids.value, cash: cash.value,
         });
+        if (initialGrids.value != null && !Number.isNaN(initialGrids.value)) {
+          u.set("init", initialGrids.value);
+        }
         history.replaceState(null, "", `/strategy/grid?${u}`);
         await nextTick();  // 等 v-if 的图表容器进入 DOM
         render();
@@ -144,8 +153,8 @@ const app = createApp({
       window.addEventListener("resize", () => chart && chart.resize());
     });
 
-    return { targets, code, start, gridPct, nGrids, cash, result, m, trades,
-             loading, error, run, pct };
+    return { targets, code, start, gridPct, nGrids, initialGrids, cash, result,
+             m, trades, loading, error, run, pct };
   },
 });
 

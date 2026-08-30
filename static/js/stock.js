@@ -9,9 +9,6 @@ const app = createApp({
   setup() {
     const query = ref("");
     const suggests = ref([]);
-    const code = ref("000001.SZ");
-    const range = ref("1y");
-    const adjust = ref("qfq");
     const info = ref(null);
     const latest = ref(null);
     const loading = ref(false);
@@ -24,6 +21,26 @@ const app = createApp({
     const adjusts = [
       { k: "qfq", label: "前复权" }, { k: "none", label: "不复权" }, { k: "hfq", label: "后复权" },
     ];
+
+    // ---- URL 参数 <-> 页面状态 双向同步（方便分享/收藏） ----
+    function readUrl() {
+      const p = new URLSearchParams(location.search);
+      const code = p.get("code") || "000001.SZ";
+      const range = ranges.some(r => r.k === p.get("range")) ? p.get("range") : "1y";
+      const adjust = adjusts.some(a => a.k === p.get("adjust")) ? p.get("adjust") : "qfq";
+      return { code, range, adjust };
+    }
+    const init = readUrl();
+    const code = ref(init.code);
+    const range = ref(init.range);
+    const adjust = ref(init.adjust);
+
+    function syncUrl() {
+      const p = new URLSearchParams({
+        code: code.value, range: range.value, adjust: adjust.value,
+      });
+      history.replaceState(null, "", `/stock?${p}`);
+    }
 
     let searchTimer = null;
     function onInput() {
@@ -127,6 +144,10 @@ const app = createApp({
         info.value = data.info;
         latest.value = data.latest;
         barsCache = data.bars;
+        if (data.info && data.info.name) {
+          query.value = data.info.name;
+          document.title = `${data.info.name} ${data.info.ts_code} · ps_web`;
+        }
         if (!data.bars.length) error.value = "该区间没有数据（回补可能还在进行中）";
         render(data.bars);
       } catch (e) {
@@ -136,7 +157,7 @@ const app = createApp({
       }
     }
 
-    watch([code, range, adjust], load);
+    watch([code, range, adjust], () => { syncUrl(); load(); });
     onMounted(() => {
       load();
       window.addEventListener("resize", () => chart && chart.resize());

@@ -63,6 +63,21 @@ def to_date(s):
     return pd.to_datetime(s, format="%Y%m%d").date()
 
 
+def sync_basic():
+    """同步在市股票基本信息（整表先删后插）。"""
+    print("[1] 同步股票基本信息 stock_basic ...")
+    df = call_with_retry("stock_basic", func="stock_basic", exchange="",
+                         list_status="L",
+                         fields="ts_code,symbol,name,area,industry,market,list_date")
+    df["list_date"] = df["list_date"].map(
+        lambda s: pd.to_datetime(s, format="%Y%m%d").date() if s else None)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM stock_basic"))
+        df.to_sql("stock_basic", con=conn, if_exists="append", index=False,
+                  chunksize=1000, method="multi")
+    print(f"[OK] 共 {len(df)} 只在市股票")
+
+
 def sync_cal():
     """同步上交所交易日历（4年一段，整表幂等重建；接口限流 1次/分钟 由重试自适应）。"""
     print("[1] 同步交易日历（trade_cal 限流 1次/分钟，分段间隔约 65s）...")
@@ -177,6 +192,7 @@ def main():
         return p
 
     with_common(sub.add_parser("cal", help="同步交易日历（首次必跑）"))
+    with_common(sub.add_parser("basic", help="同步股票基本信息（名称/行业等）"))
 
     p_backfill = with_common(sub.add_parser("backfill", help="回补历史日线"))
     p_backfill.add_argument("--start", required=True, help="开始日期 YYYYMMDD")
@@ -190,6 +206,7 @@ def main():
     Base.metadata.create_all(engine)  # 幂等建表
 
     {"cal": lambda: sync_cal(),
+     "basic": lambda: sync_basic(),
      "backfill": lambda: cmd_backfill(args),
      "update": lambda: cmd_update(args)}[args.cmd]()
 

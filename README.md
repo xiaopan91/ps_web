@@ -74,6 +74,15 @@ NSSM Windows 服务 `ps_web`（开机自启、崩溃 5 秒自动拉起）：
 
 改完代码发布：开发目录 `git push` → 生产目录 `prod.bat` 选 `[8]`。
 
+## 个股行情页
+
+浏览器打开 `http://127.0.0.1:8001/stock`（开发）或 `http://127.0.0.1:8000/stock`（生产）：
+
+- 搜索框支持代码/名称模糊搜索（依赖 `stock_basic` 表）
+- K 线 + 成交量副图 + MA5/10/20/60 均线，滚轮缩放 / 滑块拖动
+- 区间切换（3月/6月/1年/3年/全部）与复权切换（前复权/不复权/后复权）
+- API：`/api/stock/search?q=`、`/api/stock/daily?code=&range=&adjust=`
+
 ## 行情数据同步（tushare）
 
 数据源：tushare（token 填在 `.env` 的 `TUSHARE_TOKEN`）。全市场 A 股日线 + 复权因子 + 交易日历，
@@ -81,6 +90,7 @@ NSSM Windows 服务 `ps_web`（开机自启、崩溃 5 秒自动拉起）：
 
 ```bash
 python scripts/sync_data.py cal                        # 交易日历（首次必跑，一次性）
+python scripts/sync_data.py basic                      # 股票基本信息（名称/行业）
 python scripts/sync_data.py backfill --start 20160101  # 回补历史（10年约2小时）
 python scripts/sync_data.py update                     # 每日增量（收盘后跑）
 ```

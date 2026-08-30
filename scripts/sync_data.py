@@ -26,6 +26,7 @@ from sqlalchemy import text
 
 from app.config import TUSHARE_TOKEN
 from app.database import Base, engine
+from app.grid_engine import DEFAULT_ETFS
 import app.models  # noqa: F401  # 导入以注册模型
 
 SLEEP = 0.25  # 每次 API 调用后的间隔（秒），可由 --sleep 覆盖
@@ -168,13 +169,6 @@ def sync_index():
     print(f"[OK] 指数共新增 {total_new} 行")
 
 
-DEFAULT_ETFS = [  # 常用网格标的
-    ("510300.SH", "沪深300ETF"), ("510500.SH", "中证500ETF"),
-    ("512880.SH", "证券ETF"), ("518880.SH", "黄金ETF"),
-    ("513100.SH", "纳指ETF"), ("159915.SZ", "创业板ETF"),
-    ("512690.SH", "酒ETF"), ("515790.SH", "光伏ETF"),
-    ("512010.SH", "医药ETF"), ("510880.SH", "红利ETF"),
-]
 
 
 def sync_etf(codes=None):

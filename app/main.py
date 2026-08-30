@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import health, index_quotes, sentiment, stock
+from app.routers import health, index_quotes, sentiment, stock, strategy
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = ROOT_DIR / "templates"
@@ -18,6 +18,7 @@ app.include_router(health.router)
 app.include_router(stock.router)
 app.include_router(index_quotes.router)
 app.include_router(sentiment.router)
+app.include_router(strategy.router)
 
 # 静态资源：/static/css/... /static/js/... /static/vendor/...
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -59,3 +60,15 @@ def sentiment_page():
 def index_quotes_page():
     """指数行情页。"""
     return FileResponse(TEMPLATES_DIR / "index_quotes.html")
+
+
+@app.get("/strategy", include_in_schema=False)
+def strategy_page():
+    """买卖策略容器页。"""
+    return FileResponse(TEMPLATES_DIR / "strategy.html")
+
+
+@app.get("/strategy/grid", include_in_schema=False)
+def grid_lab_page():
+    """网格交易实验室。"""
+    return FileResponse(TEMPLATES_DIR / "grid_lab.html")

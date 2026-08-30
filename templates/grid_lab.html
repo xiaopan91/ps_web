@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>网格交易实验室 · ps_web</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    body { background: #f5f6f8; }
+    .up { color: #ef4444; }
+    .down { color: #22c55e; }
+    .metric-card { border: none; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .metric-val { font-size: 1.5rem; font-weight: 700; }
+    #chart { width: 100%; height: 380px; }
+    .trades-box { max-height: 360px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <nav class="navbar navbar-dark bg-dark">
+      <div class="container-fluid d-flex align-items-center">
+        <div class="d-flex align-items-center gap-3">
+          <a class="navbar-brand mb-0 h1" href="/">首页</a>
+          <a class="app-nav" href="/stock">个股行情</a>
+          <a class="app-nav" href="/index">指数行情</a>
+          <a class="app-nav" href="/predict">宏观预测</a>
+          <a class="app-nav active" href="/strategy">买卖策略</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container my-3">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <a class="text-muted small text-decoration-none" href="/strategy">← 买卖策略</a>
+        <h5 class="mb-0 ms-2">网格交易实验室</h5>
+      </div>
+
+      <!-- 参数表单 -->
+      <div class="card mb-3"><div class="card-body">
+        <form class="d-flex flex-wrap align-items-end gap-3" @submit.prevent="run">
+          <div>
+            <label class="form-label small text-muted mb-1">标的</label>
+            <select class="form-select form-select-sm" v-model="code" style="min-width:160px;">
+              <option v-for="t in targets" :key="t.ts_code" :value="t.ts_code">{{ t.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label small text-muted mb-1">开始日期</label>
+            <input type="date" class="form-control form-control-sm" v-model="start" style="width:auto;">
+          </div>
+          <div>
+            <label class="form-label small text-muted mb-1">格距 %</label>
+            <input type="number" class="form-control form-control-sm" v-model.number="gridPct"
+                   min="0.5" max="50" step="0.5" style="width:90px;">
+          </div>
+          <div>
+            <label class="form-label small text-muted mb-1">格数</label>
+            <input type="number" class="form-control form-control-sm" v-model.number="nGrids"
+                   min="2" max="50" style="width:80px;">
+          </div>
+          <div>
+            <label class="form-label small text-muted mb-1">初始资金</label>
+            <input type="number" class="form-control form-control-sm" v-model.number="cash"
+                   min="10000" step="10000" style="width:120px;">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" :disabled="loading">
+            {{ loading ? '回测中…' : '运行回测' }}</button>
+          <span class="text-danger small" v-if="error">{{ error }}</span>
+        </form>
+      </div></div>
+
+      <!-- 指标卡 -->
+      <div class="row g-3 mb-3" v-if="m">
+        <div class="col-6 col-md-2"><div class="card metric-card h-100"><div class="card-body py-2">
+          <div class="text-muted small">网格总收益</div>
+          <div class="metric-val" :class="m.total_ret >= 0 ? 'up' : 'down'">{{ pct(m.total_ret) }}</div>
+        </div></div></div>
+        <div class="col-6 col-md-2"><div class="card metric-card h-100"><div class="card-body py-2">
+          <div class="text-muted small">买入持有</div>
+          <div class="metric-val" :class="m.bh_ret >= 0 ? 'up' : 'down'">{{ pct(m.bh_ret) }}</div>
+        </div></div></div>
+        <div class="col-6 col-md-2"><div class="card metric-card h-100"><div class="card-body py-2">
+          <div class="text-muted small">年化收益</div>
+          <div class="metric-val">{{ pct(m.ann_ret) }}</div>
+        </div></div></div>
+        <div class="col-6 col-md-2"><div class="card metric-card h-100"><div class="card-body py-2">
+          <div class="text-muted small">最大回撤</div>
+          <div class="metric-val down">{{ pct(m.max_dd) }}</div>
+        </div></div></div>
+        <div class="col-6 col-md-2"><div class="card metric-card h-100"><div class="card-body py-2">
+          <div class="text-muted small">交易次数</div>
+          <div class="metric-val">{{ m.n_buys }} 买 / {{ m.n_sells }} 卖</div>
+        </div></div></div>
+        <div class="col-6 col-md-2"><div class="card metric-card h-100"><div class="card-body py-2">
+          <div class="text-muted small">配对胜率</div>
+          <div class="metric-val">{{ m.win_rate == null ? '—' : (m.win_rate*100).toFixed(0) + '%' }}</div>
+        </div></div></div>
+      </div>
+
+      <!-- 净值曲线 -->
+      <div class="card mb-3" v-if="result"><div class="card-body">
+        <h6 class="card-title mb-3">净值曲线：网格 vs 买入持有</h6>
+        <div id="chart"></div>
+      </div></div>
+
+      <!-- 交易明细 -->
+      <div class="card" v-if="trades.length"><div class="card-body">
+        <h6 class="card-title mb-3">交易明细（{{ trades.length }} 笔）</h6>
+        <div class="trades-box">
+          <table class="table table-sm table-striped mb-0">
+            <thead><tr><th>日期</th><th>方向</th><th class="text-end">价格</th>
+              <th class="text-end">份额</th><th class="text-end">费用</th>
+              <th class="text-end">配对盈亏</th></tr></thead>
+            <tbody>
+              <tr v-for="(t, i) in trades" :key="i">
+                <td>{{ t.date }}</td>
+                <td :class="t.side === '买' ? 'up' : 'down'">{{ t.side }}</td>
+                <td class="text-end">{{ t.price }}</td>
+                <td class="text-end">{{ t.qty.toLocaleString() }}</td>
+                <td class="text-end">{{ t.fee }}</td>
+                <td class="text-end" v-if="t.pnl != null" :class="t.pnl >= 0 ? 'up' : 'down'">{{ t.pnl }}</td>
+                <td class="text-end text-muted" v-else>—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div></div>
+    </main>
+  </div>
+
+  <script src="/static/vendor/vue/vue.global.prod.js"></script>
+  <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="/static/vendor/echarts/echarts.min.js"></script>
+  <script src="/static/js/grid_lab.js"></script>
+</body>
+</html>

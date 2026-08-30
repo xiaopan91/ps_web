@@ -66,9 +66,9 @@
         <div class="col-md-3">
           <div class="card h-100"><div class="card-body text-center">
             <div class="text-muted small">市场情绪分（0-100）</div>
-            <div class="score-big" :style="{color: scoreColor}">{{ latest ? latest.score : '—' }}</div>
+            <div class="score-big" :style="{color: scoreColor}">{{ snap ? snap.score : '—' }}</div>
             <div class="mt-1" :style="{color: scoreColor}">{{ zoneLabel }}</div>
-            <div class="text-muted small mt-1">{{ latest ? latest.trade_date : '' }}</div>
+            <div class="text-muted small mt-1">{{ snap ? snap.trade_date : '' }}</div>
           </div></div>
         </div>
         <div class="col-md-9">
@@ -87,13 +87,22 @@
         </div>
       </div>
 
-      <!-- 区间切换 -->
-      <div class="d-flex align-items-center gap-3 mb-3">
+      <!-- 区间 + 日期选择 -->
+      <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
         <div class="btn-group btn-group-sm">
           <button v-for="d in dayOptions" :key="d.k" class="btn" type="button"
                   :class="days === d.k ? 'btn-primary' : 'btn-outline-primary'"
                   @click="days = d.k">{{ d.label }}</button>
         </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="text-muted small">截至日期</span>
+          <input type="date" class="form-control form-control-sm" style="width: auto;"
+                 v-model="selectedDate" :min="minDate" :max="maxDate">
+        </div>
+        <span class="text-muted small" v-if="snap && snap.trade_date !== maxDate"
+              title="所选日期非交易日，已回退到最近的上一个交易日">
+          （{{ snap.trade_date }} 交易日）
+        </span>
         <span class="text-muted small" v-if="loading">加载中…</span>
         <span class="text-danger small" v-if="error">{{ error }}</span>
       </div>

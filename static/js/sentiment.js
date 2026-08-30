@@ -11,9 +11,9 @@ const FACTOR_LABELS = {
 const app = createApp({
   setup() {
     const days = ref(new URLSearchParams(location.search).get("days") || "250");
+    const selectedDate = ref(new URLSearchParams(location.search).get("date") || "");
     const loading = ref(false);
     const error = ref("");
-    const latest = ref(null);
     const data = ref(null);
     const dayOptions = [
       { k: "90", label: "3月" }, { k: "250", label: "1年" },
@@ -29,8 +29,45 @@ const app = createApp({
       }
     }
 
+    // ---- 任意历史日期快照 ----
+    const snapIndex = computed(() => {
+      const d = data.value;
+      if (!d || !d.dates.length) return -1;
+      if (!selectedDate.value) return d.dates.length - 1;
+      let i = d.dates.length - 1;
+      while (i > 0 && d.dates[i] > selectedDate.value) i--;  // 非交易日回退到上一交易日
+      return i;
+    });
+    const minDate = computed(() => (data.value && data.value.dates.length)
+      ? data.value.dates[0] : "");
+    const maxDate = computed(() => (data.value && data.value.dates.length)
+      ? data.value.dates[data.value.dates.length - 1] : "");
+    const snap = computed(() => {
+      const d = data.value;
+      const i = snapIndex.value;
+      if (!d || i < 0) return null;
+      const at = (arr) => (arr ? arr[i] : null);
+      const num = (v, div = 1, digits = 0) =>
+        v == null ? null : +(v / div).toFixed(digits);
+      return {
+        trade_date: d.dates[i],
+        score: at(d.score) == null ? null : +at(d.score).toFixed(1),
+        up: at(d.up), down: at(d.down),
+        limit_up: at(d.limit_up), limit_down: at(d.limit_down),
+        max_streak: at(d.max_streak),
+        total_amount_yi: num(at(d.total_amount), 1e8),
+        amount_ratio: at(d.amount_ratio) == null ? null : +at(d.amount_ratio).toFixed(3),
+        median_pct: at(d.median_pct) == null ? null : +at(d.median_pct).toFixed(2),
+        margin_balance_yi: num(at(d.margin_balance), 1e8),
+        north_net_yi: num(at(d.north_net), 1e4, 1),
+        sh_close: at(d.sh_close) == null ? null : +at(d.sh_close).toFixed(1),
+        factors: Object.fromEntries(
+          Object.entries(d.factor_scores || {}).map(([k, arr]) => [k, at(arr)])),
+      };
+    });
+
     const scoreColor = computed(() => {
-      const s = latest.value ? latest.value.score : null;
+      const s = snap.value ? snap.value.score : null;
       if (s == null) return GRAY;
       if (s >= 80) return UP;
       if (s >= 60) return "#f97316";
@@ -39,7 +76,7 @@ const app = createApp({
       return DOWN;
     });
     const zoneLabel = computed(() => {
-      const s = latest.value ? latest.value.score : null;
+      const s = snap.value ? snap.value.score : null;
       if (s == null) return "";
       if (s >= 80) return "过热";
       if (s >= 60) return "偏热";
@@ -49,7 +86,7 @@ const app = createApp({
     });
 
     const factorCards = computed(() => {
-      const l = latest.value;
+      const l = snap.value;
       if (!l) return [];
       const fs = l.factors || {};
       const defs = [
@@ -86,7 +123,14 @@ const app = createApp({
         series: [
           { name: "情绪分", type: "line", data: d.score, showSymbol: false,
             lineStyle: { width: 2, color: BLUE }, itemStyle: { color: BLUE },
-            areaStyle: { opacity: 0.08 } },
+            areaStyle: { opacity: 0.08 },
+            markLine: selectedDate.value ? {
+              symbol: "none", silent: true,
+              lineStyle: { color: BLUE, type: "dashed", opacity: 0.7 },
+              label: { formatter: selectedDate.value, position: "insideEndTop",
+                       fontSize: 10 },
+              data: [{ xAxis: selectedDate.value }],
+            } : undefined },
           { name: "上证指数", type: "line", yAxisIndex: 1, data: d.sh_close,
             showSymbol: false, lineStyle: { width: 1, color: GRAY },
             itemStyle: { color: GRAY } },
@@ -166,7 +210,9 @@ const app = createApp({
         const res = await fetch(`/api/sentiment/history?days=${days.value}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         data.value = await res.json();
-        latest.value = data.value.latest;
+        if (!selectedDate.value && data.value.dates.length) {
+          selectedDate.value = data.value.dates[data.value.dates.length - 1];
+        }
         render();
       } catch (e) {
         error.value = e.message;
@@ -175,11 +221,16 @@ const app = createApp({
       }
     }
 
-    watch(days, () => {
+    function syncUrl() {
       const p = new URLSearchParams({ days: days.value });
+      if (selectedDate.value && selectedDate.value !== maxDate.value) {
+        p.set("date", selectedDate.value);
+      }
       history.replaceState(null, "", `/sentiment?${p}`);
-      load();
-    });
+    }
+
+    watch(days, () => { syncUrl(); load(); });
+    watch(selectedDate, () => { syncUrl(); render(); });
     onMounted(() => {
       initCharts();
       load();
@@ -187,8 +238,8 @@ const app = createApp({
         () => Object.values(charts).forEach(c => c.resize()));
     });
 
-    return { days, dayOptions, loading, error, latest, factorCards,
-             scoreColor, zoneLabel };
+    return { days, dayOptions, loading, error, selectedDate, minDate, maxDate,
+             snap, factorCards, scoreColor, zoneLabel };
   },
 });
 

@@ -100,8 +100,11 @@ def history(days: str = Query(default="250")):
         "up": col("up_count"),
         "down": col("down_count"),
         "limit_up": col("limit_up"),
+        "limit_down": col("limit_down"),
         "max_streak": col("max_streak"),
         "total_amount": col("total_amount"),
+        "amount_ratio": col("amount_ratio"),
+        "median_pct": col("median_pct"),
         "margin_balance": col("margin_balance"),
         "north_net": col("north_net"),
         "factor_scores": {c: [None if pd.isna(v) else round(float(v), 0)

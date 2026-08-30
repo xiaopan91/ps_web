@@ -1,54 +1,55 @@
 @echo off
-title ps_web ¿ª·¢·şÎñ
+chcp 65001 >nul
+title ps_web å¼€å‘æœåŠ¡
 cd /d "%~dp0"
 
 echo ============================================
-echo    ps_web Ò»¼üÆô¶¯
+echo    ps_web ä¸€é”®å¯åŠ¨
 echo ============================================
 
-rem ---- 1. ¼ì²éĞéÄâ»·¾³ ----
+rem ---- 1. æ£€æŸ¥è™šæ‹Ÿç¯å¢ƒ ----
 if not exist ".venv\Scripts\python.exe" (
-    echo [´íÎó] Î´ÕÒµ½ĞéÄâ»·¾³ .venv
-    echo        ÇëÏÈÔÚÏîÄ¿Ä¿Â¼Ö´ĞĞ:
+    echo [é”™è¯¯] æœªæ‰¾åˆ°è™šæ‹Ÿç¯å¢ƒ .venv
+    echo        è¯·å…ˆåœ¨é¡¹ç›®ç›®å½•æ‰§è¡Œ:
     echo            python -m venv .venv
     echo            .venv\Scripts\python -m pip install -r requirements.txt
     pause
     exit /b 1
 )
-echo [OK] ĞéÄâ»·¾³¾ÍĞ÷
+echo [OK] è™šæ‹Ÿç¯å¢ƒå°±ç»ª
 
-rem ---- 2. ¼ì²é MySQL ·şÎñ£¨Í£ÁË¾ÍÊÔ×ÅÀ­Æğ£©----
+rem ---- 2. æ£€æŸ¥ MySQL æœåŠ¡ï¼ˆåœäº†å°±è¯•ç€æ‹‰èµ·ï¼‰----
 sc query MySQL80 | findstr RUNNING >nul 2>&1
 if errorlevel 1 (
-    echo [ĞÅÏ¢] MySQL80 Î´ÔËĞĞ£¬³¢ÊÔÆô¶¯...
+    echo [ä¿¡æ¯] MySQL80 æœªè¿è¡Œï¼Œå°è¯•å¯åŠ¨...
     net start MySQL80 >nul 2>&1
     sc query MySQL80 | findstr RUNNING >nul 2>&1
     if errorlevel 1 (
-        echo [¾¯¸æ] MySQL80 Æô¶¯Ê§°Ü£¬¶à°ëÊÇÈ¨ÏŞ²»¹»
-        echo        ÇëÓÒ¼üÒÔ¹ÜÀíÔ±Éí·İÔËĞĞ±¾½Å±¾¡£Web ÈÔ»áÆô¶¯£¬µ«Ò³ÃæÉÏÊı¾İ¿âÊÇºìµÆ¡£
+        echo [è­¦å‘Š] MySQL80 å¯åŠ¨å¤±è´¥ï¼Œå¤šåŠæ˜¯æƒé™ä¸å¤Ÿ
+        echo        è¯·å³é”®ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œæœ¬è„šæœ¬ã€‚Web ä»ä¼šå¯åŠ¨ï¼Œä½†é¡µé¢ä¸Šæ•°æ®åº“æ˜¯çº¢ç¯ã€‚
     ) else (
-        echo [OK] MySQL80 ÒÑÆô¶¯
+        echo [OK] MySQL80 å·²å¯åŠ¨
     )
 ) else (
-    echo [OK] MySQL80 ÔËĞĞÖĞ
+    echo [OK] MySQL80 è¿è¡Œä¸­
 )
 
-rem ---- 3. ·şÎñÒÑÔÚÅÜ¾ÍÖ»¿ªä¯ÀÀÆ÷ ----
+rem ---- 3. æœåŠ¡å·²åœ¨è·‘å°±åªå¼€æµè§ˆå™¨ ----
 netstat -ano | findstr :8000 | findstr LISTENING >nul 2>&1
 if not errorlevel 1 (
-    echo [ĞÅÏ¢] ¶Ë¿Ú 8000 ÒÑÓĞ·şÎñÔÚÅÜ£¬Ö±½Ó´ò¿ªä¯ÀÀÆ÷
+    echo [ä¿¡æ¯] ç«¯å£ 8000 å·²æœ‰æœåŠ¡åœ¨è·‘ï¼Œç›´æ¥æ‰“å¼€æµè§ˆå™¨
     start http://127.0.0.1:8000
-    timeout /t 2 >nul
+    %SystemRoot%\System32\timeout.exe /t 2 >nul
     exit /b 0
 )
 
-rem ---- 4. ºóÌ¨Ğ¡ÖúÊÖ£ºµÈ·şÎñ¿ÉÁ¬½Óºó×Ô¶¯¿ªä¯ÀÀÆ÷ ----
+rem ---- 4. åå°å°åŠ©æ‰‹ï¼šç­‰æœåŠ¡å¯è¿æ¥åè‡ªåŠ¨å¼€æµè§ˆå™¨ ----
 start "" /min powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 40;$i++){try{$c=New-Object Net.Sockets.TcpClient;$c.Connect('127.0.0.1',8000);$c.Close();Start-Process 'http://127.0.0.1:8000';break}catch{Start-Sleep 1}}"
 
-rem ---- 5. Ç°Ì¨Æô¶¯¿ª·¢·şÎñÆ÷£¨±¾´°¿Ú¼´ÈÕÖ¾´°¿Ú£¬Ctrl+C Í£Ö¹£©----
-echo [OK] Æô¶¯¿ª·¢·şÎñÆ÷£ºhttp://127.0.0.1:8000
+rem ---- 5. å‰å°å¯åŠ¨å¼€å‘æœåŠ¡å™¨ï¼ˆæœ¬çª—å£å³æ—¥å¿—çª—å£ï¼ŒCtrl+C åœæ­¢ï¼‰----
+echo [OK] å¯åŠ¨å¼€å‘æœåŠ¡å™¨ï¼šhttp://127.0.0.1:8000
 ".venv\Scripts\python.exe" run.py
 
 echo.
-echo [ĞÅÏ¢] ·şÎñÒÑÍ£Ö¹
+echo [ä¿¡æ¯] æœåŠ¡å·²åœæ­¢
 pause

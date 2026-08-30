@@ -12,11 +12,13 @@
   <!-- Vue 应用挂载点 -->
   <div id="app">
     <nav class="navbar navbar-dark bg-dark">
-      <div class="container-fluid">
-        <span class="navbar-brand mb-0 h1">ps_web</span>
-        <a class="nav-link text-white-50 d-none d-md-inline" href="/stock">个股行情</a>
-        <a class="nav-link text-white-50 d-none d-md-inline" href="/sentiment">市场情绪 →</a>
-        <span class="navbar-text small">
+      <div class="container-fluid d-flex align-items-center">
+        <div class="d-flex align-items-center">
+          <a class="navbar-brand mb-0 h1" href="/">首页</a>
+          <a class="nav-link text-white-50" href="/stock">个股行情</a>
+          <a class="nav-link text-white-50" href="/sentiment">市场情绪</a>
+        </div>
+        <span class="navbar-text small ms-auto">
           后端：<span :class="backendOk ? 'text-success' : 'text-danger'">{{ backendStatus }}</span>
           <span class="mx-2">·</span>
           数据库：<span :class="dbOk ? 'text-success' : 'text-danger'">{{ dbStatus }}</span>

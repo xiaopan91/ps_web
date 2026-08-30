@@ -1,8 +1,8 @@
 """FastAPI 入口：挂载 API 路由、静态资源、首页。"""
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.routers import health, index_quotes, sentiment, stock
@@ -36,8 +36,22 @@ def stock_page():
 
 
 @app.get("/sentiment", include_in_schema=False)
+def sentiment_redirect(request: Request):
+    """旧地址重定向到 /predict/sentiment（保留查询参数）。"""
+    qs = str(request.query_params)
+    return RedirectResponse(f"/predict/sentiment?{qs}" if qs else "/predict/sentiment",
+                            status_code=307)
+
+
+@app.get("/predict", include_in_schema=False)
+def predict_page():
+    """宏观预测容器页。"""
+    return FileResponse(TEMPLATES_DIR / "predict.html")
+
+
+@app.get("/predict/sentiment", include_in_schema=False)
 def sentiment_page():
-    """市场情绪页。"""
+    """市场情绪页（宏观预测下）。"""
     return FileResponse(TEMPLATES_DIR / "sentiment.html")
 
 

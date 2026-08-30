@@ -234,7 +234,7 @@ const app = createApp({
       if (selectedDate.value && selectedDate.value !== maxDate.value) {
         p.set("date", selectedDate.value);
       }
-      history.replaceState(null, "", `/sentiment?${p}`);
+      history.replaceState(null, "", `/predict/sentiment?${p}`);
     }
 
     watch(days, () => { syncUrl(); load(); });

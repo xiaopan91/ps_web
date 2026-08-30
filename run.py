@@ -5,4 +5,7 @@
 import uvicorn
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
+    # use_colors=False：不输出 ANSI 颜色码（老式控制台不解析，会显示成方框）
+    uvicorn.run(
+        "app.main:app", host="127.0.0.1", port=8000, reload=True, use_colors=False
+    )

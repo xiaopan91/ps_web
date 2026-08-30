@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ps_web</title>
+  <!-- Bootstrap 5（本地） -->
+  <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <!-- Vue 应用挂载点 -->
+  <div id="app">
+    <nav class="navbar navbar-dark bg-dark">
+      <div class="container-fluid">
+        <span class="navbar-brand mb-0 h1">ps_web</span>
+        <span class="navbar-text small">
+          后端：<span :class="backendOk ? 'text-success' : 'text-danger'">{{ backendStatus }}</span>
+          <span class="mx-2">·</span>
+          数据库：<span :class="dbOk ? 'text-success' : 'text-danger'">{{ dbStatus }}</span>
+        </span>
+      </div>
+    </nav>
+
+    <main class="container my-4">
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5 class="card-title">{{ message }}</h5>
+              <p class="card-text text-muted">
+                环境验证页：Vue 3 + Bootstrap 5 + ECharts 全部从本地加载，
+                FastAPI 统一托管页面与 API。
+              </p>
+              <button class="btn btn-primary" @click="refresh">重新检测</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-8">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5 class="card-title">ECharts K 线图示例（模拟数据）</h5>
+              <div id="chart" class="chart"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Vue 3 / Bootstrap / ECharts（本地 vendor，免编译） -->
+  <script src="/static/vendor/vue/vue.global.prod.js"></script>
+  <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="/static/vendor/echarts/echarts.min.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

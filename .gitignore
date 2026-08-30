@@ -1,0 +1,18 @@
+# 虚拟环境（每台机器自己创建）
+.venv/
+
+# 敏感配置（密码等，用 .env.example 做模板）
+.env
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 本地数据库文件 / 日志
+*.sqlite3
+*.log
+
+# 编辑器
+.vscode/
+.idea/

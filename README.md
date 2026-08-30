@@ -94,6 +94,22 @@ NSSM Windows 服务 `ps_web`（开机自启、崩溃 5 秒自动拉起）：
 - 涨跌停为自算（主板 10% / 创业板科创板 20% / 北交所 30% / ST 5%）
 - API：`/api/sentiment/history?days=`
 
+## 网格交易回测
+
+```bash
+python scripts/backtest_grid.py --code 510300.SH --start 20160101            # 单次回测
+python scripts/backtest_grid.py --code 510300.SH --start 20160101 --scan     # 参数扫描
+python scripts/backtest_grid.py --code 510300.SH --start 20160101 --csv t.csv  # 交易明细
+```
+
+等比对称网格（日线级）：后复权价画格线，下穿未持有的线买一格、上穿其上一格卖出，
+每对往返固定赚一格间距；支持个股（daily_bar）与 ETF（fund_daily）自动识别。
+ETF 数据：`python scripts/sync_data.py etf [--codes 510300.SH,...]`（默认 10 只常用网格标的）。
+
+510300 十年（2016-2026）实测：网格 +23% vs 持有 +60%——单边上行市网格天然跑输；
+但 2018 单边跌亏损减半（-11% vs -25%）、2021-23 慢熊少亏 15 个点。
+网格的本质是震荡收割 + 下跌缓冲，不是趋势赚钱工具。
+
 ## 行情数据同步（tushare）
 
 数据源：tushare（token 填在 `.env` 的 `TUSHARE_TOKEN`）。全市场 A 股日线 + 复权因子 + 交易日历，

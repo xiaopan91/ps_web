@@ -168,6 +168,89 @@ def sync_index():
     print(f"[OK] 指数共新增 {total_new} 行")
 
 
+DEFAULT_ETFS = [  # 常用网格标的
+    ("510300.SH", "沪深300ETF"), ("510500.SH", "中证500ETF"),
+    ("512880.SH", "证券ETF"), ("518880.SH", "黄金ETF"),
+    ("513100.SH", "纳指ETF"), ("159915.SZ", "创业板ETF"),
+    ("512690.SH", "酒ETF"), ("515790.SH", "光伏ETF"),
+    ("512010.SH", "医药ETF"), ("510880.SH", "红利ETF"),
+]
+
+
+def sync_etf(codes=None):
+    """同步 ETF 信息与日线。codes 为空用默认清单；复权因子写入 adj_factor 表
+    （结构与个股一致、代码空间不冲突，回测统一读取）。"""
+    print("[etf] 同步基金基本信息 fund_basic ...")
+    df = call_with_retry("fund_basic", func="fund_basic", market="E",
+                         fields="ts_code,name,management,fund_type,list_date,market")
+    df = df[["ts_code", "name", "management", "fund_type", "list_date", "market"]]
+    df["list_date"] = df["list_date"].map(
+        lambda s: pd.to_datetime(s, format="%Y%m%d").date() if s else None)
+    n = _delete_insert("fund_basic", df, "1=1", {})
+    print(f"[OK] 共 {n} 只 ETF")
+
+    targets = codes if codes else [c for c, _ in DEFAULT_ETFS]
+    print(f"[etf] 同步 {len(targets)} 只 ETF 日线（4年分段，自增补差）...")
+    for code in targets:
+        # fund_daily
+        with engine.connect() as conn:
+            mx = conn.execute(text(
+                "SELECT MAX(trade_date) FROM fund_daily WHERE ts_code = :c"
+            ), {"c": code}).scalar()
+        start = (mx + timedelta(days=1)) if mx else date(2015, 1, 1)
+        if start > date.today():
+            print(f"  {code} fund_daily: 已最新")
+        else:
+            frames = []
+            y0 = start.year
+            while y0 <= date.today().year:
+                y1 = min(y0 + 3, date.today().year)
+                s = max(start, date(y0, 1, 1)).strftime("%Y%m%d")
+                e = min(date(y1, 12, 31), date.today()).strftime("%Y%m%d")
+                if s <= e:
+                    frames.append(call_with_retry(f"fund_daily {code} {y0}",
+                                                  func="fund_daily", ts_code=code,
+                                                  start_date=s, end_date=e))
+                y0 += 4
+            if frames:
+                df = pd.concat(frames, ignore_index=True)
+                df = df[["ts_code", "trade_date", "open", "high", "low",
+                         "close", "vol", "amount"]]
+                df["trade_date"] = df["trade_date"].map(to_date)
+                cnt = _delete_insert("fund_daily", df, "ts_code = :c", {"c": code})
+                print(f"  {code} fund_daily: +{len(df)} 行（库内 {cnt}）")
+
+        # fund_adj → adj_factor 表（先删该代码的旧行）
+        with engine.connect() as conn:
+            mx = conn.execute(text(
+                "SELECT MAX(trade_date) FROM adj_factor WHERE ts_code = :c"
+            ), {"c": code}).scalar()
+        start = (mx + timedelta(days=1)) if mx else date(2015, 1, 1)
+        if start > date.today():
+            continue
+        frames = []
+        y0 = start.year
+        while y0 <= date.today().year:
+            y1 = min(y0 + 3, date.today().year)
+            s = max(start, date(y0, 1, 1)).strftime("%Y%m%d")
+            e = min(date(y1, 12, 31), date.today()).strftime("%Y%m%d")
+            if s <= e:
+                frames.append(call_with_retry(f"fund_adj {code} {y0}",
+                                              func="fund_adj", ts_code=code,
+                                              start_date=s, end_date=e))
+            y0 += 4
+        if frames:
+            df = pd.concat(frames, ignore_index=True)[["ts_code", "trade_date",
+                                                       "adj_factor"]]
+            df["trade_date"] = df["trade_date"].map(to_date)
+            with engine.begin() as conn:
+                conn.execute(text("DELETE FROM adj_factor WHERE ts_code = :c"),
+                             {"c": code})
+                df.to_sql("adj_factor", con=conn, if_exists="append", index=False,
+                          chunksize=1000, method="multi")
+            print(f"  {code} adj_factor: {len(df)} 行")
+
+
 def sync_hsgt():
     """同步沪深港通资金流向（按年分段——接口单次约 300 行上限，自增补差）。"""
     print("[hsgt] 同步北向资金（按年分段）...")
@@ -397,6 +480,9 @@ def main():
     with_common(sub.add_parser("basic", help="同步股票基本信息"))
     with_common(sub.add_parser("index", help="同步 13 只指数日线"))
     with_common(sub.add_parser("hsgt", help="同步北向资金"))
+    p_etf = with_common(sub.add_parser("etf", help="同步 ETF 信息与常用标的日线"))
+    p_etf.add_argument("--codes", default=None,
+                       help="逗号分隔的 ETF 代码，默认常用网格标的清单")
 
     p_backfill = with_common(sub.add_parser("backfill", help="回补历史（日线/复权/指标/两融）"))
     p_backfill.add_argument("--start", required=True, help="开始日期 YYYYMMDD")
@@ -421,7 +507,9 @@ def main():
         recompute_sentiment(s)
     else:
         {"cal": sync_cal, "basic": sync_basic,
-         "index": sync_index, "hsgt": sync_hsgt}[args.cmd]()
+         "index": sync_index, "hsgt": sync_hsgt,
+         "etf": lambda: sync_etf(args.codes.split(",") if args.codes else None)
+         }[args.cmd]()
 
 
 if __name__ == "__main__":

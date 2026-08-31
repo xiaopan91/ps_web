@@ -134,6 +134,12 @@ def patch_schedule(sid: int, body: dict):
         except ValueError:
             db.close()
             raise HTTPException(400, "时间格式应为 HH:MM")
+    if "weekdays" in body:
+        ws = body["weekdays"]
+        if not isinstance(ws, list) or not ws or not all(1 <= int(w) <= 7 for w in ws):
+            db.close()
+            raise HTTPException(400, "weekdays 应为 1~7 的非空数组")
+        sch.weekdays = ",".join(str(int(w)) for w in sorted(ws))
     db.commit()
     result = _rule_out(sch)
     db.close()

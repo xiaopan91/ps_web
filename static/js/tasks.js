@@ -11,6 +11,27 @@ const app = createApp({
     const paramVals = ref({});
     const msg = ref("");
     const newRule = ref({ task_id: "", run_time: "16:35", weekdays: [1, 2, 3, 4, 5] });
+    const editing = ref(null);
+
+    function startEdit(s) {
+      editing.value = { id: s.id, run_time: s.run_time, weekdays: [...s.weekdays] };
+    }
+
+    async function saveEdit() {
+      const e = editing.value;
+      if (!e.weekdays.length) { alert("至少选择一个星期"); return; }
+      const res = await fetch(`/api/tasks/schedules/${e.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ run_time: e.run_time, weekdays: e.weekdays }),
+      });
+      if (!res.ok) {
+        const m = await res.json().catch(() => ({}));
+        alert(m.detail || `HTTP ${res.status}`);
+        return;
+      }
+      editing.value = null;
+      loadSchedules();
+    }
     let timer = null;
 
     const fmtDur = s => {
@@ -117,6 +138,7 @@ const app = createApp({
     onUnmounted(() => clearInterval(timer));
 
     return { tasks, cur, runs, schedules, logView, paramVals, msg, newRule,
+             editing, startEdit, saveEdit,
              runTask, addSchedule, toggleSchedule, delSchedule, showLog,
              fmtDur, fmtWeek, statusText };
   },

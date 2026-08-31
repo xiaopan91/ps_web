@@ -99,6 +99,21 @@ def _delete_insert(table, df, where_sql, params):
                             params).scalar()
 
 
+def _delete_insert_range(table, df, code):
+    """按代码 + 拉取区间删除后插入（增量同步安全版：绝不触碰区间外历史）。"""
+    lo, hi = df["trade_date"].min(), df["trade_date"].max()
+    with engine.begin() as conn:
+        conn.execute(text(
+            f"DELETE FROM {table} WHERE ts_code = :c AND trade_date BETWEEN :lo AND :hi"),
+            {"c": code, "lo": lo, "hi": hi})
+        df.to_sql(table, con=conn, if_exists="append", index=False,
+                  chunksize=1000, method="multi")
+        return conn.execute(text(
+            f"SELECT COUNT(*) FROM {table} WHERE ts_code = :c "
+            "AND trade_date BETWEEN :lo AND :hi"),
+            {"c": code, "lo": lo, "hi": hi}).scalar()
+
+
 # ---------------------------------------------------------------- 基础同步
 
 def sync_basic():
@@ -132,16 +147,17 @@ def sync_cal():
     print(f"[OK] 日历共 {n} 天")
 
 
-def sync_index():
-    """同步 13 只指数日线（逐指数 4 年分段，自增补差）。"""
-    print(f"[index] 同步 {len(INDICES)} 只指数日线 ...")
+def sync_index(full=False):
+    """同步 13 只指数日线（逐指数 4 年分段，自增补差；full=True 强制从 2015 全量）。"""
+    print(f"[index] 同步 {len(INDICES)} 只指数日线{'（强制全量）' if full else ''} ...")
     total_new = 0
     for code, name in INDICES:
         with engine.connect() as conn:
             mx = conn.execute(text(
                 "SELECT MAX(trade_date) FROM index_daily WHERE ts_code = :c"
             ), {"c": code}).scalar()
-        start = (mx + timedelta(days=1)) if mx else date(2015, 1, 1)
+        start = date(2015, 1, 1) if full else \
+            ((mx + timedelta(days=1)) if mx else date(2015, 1, 1))
         if start > date.today():
             print(f"  {name} {code}: 已最新")
             continue
@@ -163,17 +179,17 @@ def sync_index():
         df = df[["ts_code", "trade_date", "open", "high", "low", "close",
                  "pct_chg", "vol", "amount"]]
         df["trade_date"] = df["trade_date"].map(to_date)
-        n = _delete_insert("index_daily", df, "ts_code = :c", {"c": code})
+        n = _delete_insert_range("index_daily", df, code)
         total_new += len(df)
-        print(f"  {name} {code}: +{len(df)} 行（库内 {n}）")
+        print(f"  {name} {code}: +{len(df)} 行（区间内 {n}）")
     print(f"[OK] 指数共新增 {total_new} 行")
 
 
 
 
-def sync_etf(codes=None):
-    """同步 ETF 信息与日线。codes 为空用默认清单；复权因子写入 adj_factor 表
-    （结构与个股一致、代码空间不冲突，回测统一读取）。"""
+def sync_etf(codes=None, full=False):
+    """同步 ETF 信息与日线。codes 为空用默认清单；full=True 强制从 2015 全量。
+    复权因子写入 adj_factor 表（结构与个股一致、代码空间不冲突，回测统一读取）。"""
     print("[etf] 同步基金基本信息 fund_basic ...")
     df = call_with_retry("fund_basic", func="fund_basic", market="E",
                          fields="ts_code,name,management,fund_type,list_date,market")
@@ -191,7 +207,8 @@ def sync_etf(codes=None):
             mx = conn.execute(text(
                 "SELECT MAX(trade_date) FROM fund_daily WHERE ts_code = :c"
             ), {"c": code}).scalar()
-        start = (mx + timedelta(days=1)) if mx else date(2015, 1, 1)
+        start = date(2015, 1, 1) if full else \
+            ((mx + timedelta(days=1)) if mx else date(2015, 1, 1))
         if start > date.today():
             print(f"  {code} fund_daily: 已最新")
         else:
@@ -211,15 +228,16 @@ def sync_etf(codes=None):
                 df = df[["ts_code", "trade_date", "open", "high", "low",
                          "close", "vol", "amount"]]
                 df["trade_date"] = df["trade_date"].map(to_date)
-                cnt = _delete_insert("fund_daily", df, "ts_code = :c", {"c": code})
-                print(f"  {code} fund_daily: +{len(df)} 行（库内 {cnt}）")
+                cnt = _delete_insert_range("fund_daily", df, code)
+                print(f"  {code} fund_daily: +{len(df)} 行（区间内 {cnt}）")
 
-        # fund_adj → adj_factor 表（先删该代码的旧行）
+        # fund_adj → adj_factor 表（区间内重建）
         with engine.connect() as conn:
             mx = conn.execute(text(
                 "SELECT MAX(trade_date) FROM adj_factor WHERE ts_code = :c"
             ), {"c": code}).scalar()
-        start = (mx + timedelta(days=1)) if mx else date(2015, 1, 1)
+        start = date(2015, 1, 1) if full else \
+            ((mx + timedelta(days=1)) if mx else date(2015, 1, 1))
         if start > date.today():
             continue
         frames = []
@@ -237,12 +255,15 @@ def sync_etf(codes=None):
             df = pd.concat(frames, ignore_index=True)[["ts_code", "trade_date",
                                                        "adj_factor"]]
             df["trade_date"] = df["trade_date"].map(to_date)
+            lo, hi = df["trade_date"].min(), df["trade_date"].max()
             with engine.begin() as conn:
-                conn.execute(text("DELETE FROM adj_factor WHERE ts_code = :c"),
-                             {"c": code})
+                conn.execute(text(
+                    "DELETE FROM adj_factor WHERE ts_code = :c "
+                    "AND trade_date BETWEEN :lo AND :hi"),
+                    {"c": code, "lo": lo, "hi": hi})
                 df.to_sql("adj_factor", con=conn, if_exists="append", index=False,
                           chunksize=1000, method="multi")
-            print(f"  {code} adj_factor: {len(df)} 行")
+            print(f"  {code} adj_factor: {len(df)} 行（区间内重建）")
 
 
 def sync_hsgt():
@@ -487,9 +508,13 @@ def main():
 
     with_common(sub.add_parser("cal", help="同步交易日历（首次必跑）"))
     with_common(sub.add_parser("basic", help="同步股票基本信息"))
-    with_common(sub.add_parser("index", help="同步 13 只指数日线"))
+    p_index = with_common(sub.add_parser("index", help="同步 13 只指数日线"))
+    p_index.add_argument("--full", action="store_true",
+                         help="忽略断点，从 2015 强制全量重拉")
     with_common(sub.add_parser("hsgt", help="同步北向资金"))
     p_etf = with_common(sub.add_parser("etf", help="同步 ETF 信息与常用标的日线"))
+    p_etf.add_argument("--full", action="store_true",
+                       help="忽略断点，从 2015 强制全量重拉")
     p_etf.add_argument("--codes", default=None,
                        help="逗号分隔的 ETF 代码，默认常用网格标的清单")
 
@@ -516,8 +541,10 @@ def main():
         recompute_sentiment(s)
     else:
         {"cal": sync_cal, "basic": sync_basic,
-         "index": sync_index, "hsgt": sync_hsgt,
-         "etf": lambda: sync_etf(args.codes.split(",") if args.codes else None)
+         "index": lambda: sync_index(full=args.full),
+         "hsgt": sync_hsgt,
+         "etf": lambda: sync_etf(args.codes.split(",") if args.codes else None,
+                                 full=args.full)
          }[args.cmd]()
 
 

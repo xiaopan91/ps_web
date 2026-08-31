@@ -346,8 +346,23 @@ def cmd_backfill(args):
 def cmd_update(args):
     with engine.connect() as conn:
         maxd = conn.execute(text("SELECT MAX(trade_date) FROM daily_bar")).scalar()
+        mind = conn.execute(text("SELECT MIN(trade_date) FROM daily_bar")).scalar()
     if maxd is None:
         sys.exit("[错误] 库里还没有日线数据，请先运行 backfill")
+
+    # 空洞自愈：已覆盖区间内缺失的交易日（防中间断档，补上）
+    with engine.connect() as conn:
+        holes = [r[0] for r in conn.execute(text(
+            "SELECT t.cal_date FROM trade_cal t "
+            "WHERE t.exchange='SSE' AND t.is_open=1 AND t.cal_date BETWEEN :lo AND :hi "
+            "AND NOT EXISTS (SELECT 1 FROM daily_bar d WHERE d.trade_date = t.cal_date) "
+            "ORDER BY t.cal_date"), {"lo": mind, "hi": maxd})]
+    if holes:
+        print(f"[体检] 发现 {len(holes)} 个缺失交易日，先补洞: {holes[0]} ~ {holes[-1]}")
+        run_dates(holes, "补洞")
+    else:
+        print("[体检] 已覆盖区间无缺口")
+
     dates = open_dates(maxd, date.today())
     dates = dates[1:] if dates and dates[0] == maxd else dates
     if dates:

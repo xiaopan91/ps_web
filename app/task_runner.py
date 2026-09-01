@@ -37,10 +37,16 @@ def _build_argv(task, params):
             if v not in (None, ""):
                 argv.append(str(v))
             continue
-        if v not in (None, ""):
+        if v in (None, ""):
+            if p.get("required"):
+                raise ValueError(f"缺少必填参数：{p['label']}")
+            continue
+        if p.get("flag_map"):  # 选择型参数：值→旗标映射（如 全量→--full）
+            fl = p["flag_map"].get(v)
+            if fl:
+                argv.append(fl)
+        else:
             argv.extend([p["flag"], str(v)])
-        elif p.get("required"):
-            raise ValueError(f"缺少必填参数：{p['label']}")
     return argv
 
 

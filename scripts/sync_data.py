@@ -21,6 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
+import numpy as np
 import tushare as ts
 from sqlalchemy import text
 
@@ -392,9 +393,98 @@ def cmd_update(args):
         print("[INFO] 日线已最新")
     sync_index()
     recompute_sentiment()
+    recompute_pv_rank()
 
 
 # ---------------------------------------------------------------- 情绪计算
+
+def recompute_pv_rank(full=False):
+    """重建量价综合分个股日表（全量或增量）。
+
+    增量规则：凡 daily_bar 里存在而 pv_rank 缺失的交易日都（重）算，
+    并把前一交易日的 next_ret 回填（新交易日到来后才能知道）。
+    """
+    print("[pvrank] 重建量价综合分排名 ...")
+    t0 = time.time()
+    if full:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM pv_rank"))
+    with engine.connect() as conn:
+        dates = [r[0] for r in conn.execute(text(
+            "SELECT DISTINCT trade_date FROM daily_bar ORDER BY trade_date"))]
+        have = {str(r[0]) for r in conn.execute(text(
+            "SELECT DISTINCT trade_date FROM pv_rank"))}
+    if not dates:
+        sys.exit("[错误] daily_bar 无数据")
+    todo = [d for d in dates if str(d) not in have]
+    if not todo:
+        print("[OK] pv_rank 已最新")
+        return
+    first = todo[0]
+    i = dates.index(first)
+    # 因子需要 20 日滚动 + 缓冲，取数窗口从第一个待算日往前 60 个交易日；
+    # 末尾多取一天（次日的次日收益列用）
+    lookback = dates[max(0, i - 60):i + len(todo) + 1]
+    print(f"[pvrank] 待算 {len(todo)} 个交易日（{todo[0]} ~ {todo[-1]}），"
+          f"取数窗口 {lookback[0]} ~ {lookback[-1]}")
+
+    df = pd.read_sql(text(
+        "SELECT d.ts_code, d.trade_date, d.close, d.pct_chg, d.vol, d.high, d.low, "
+        "       d.amount, b2.turnover_rate_f "
+        "FROM daily_bar d LEFT JOIN daily_basic b2 "
+        "  ON b2.ts_code = d.ts_code AND b2.trade_date = d.trade_date "
+        "WHERE d.trade_date BETWEEN :s AND :e ORDER BY d.ts_code, d.trade_date"),
+        engine, params={"s": lookback[0], "e": lookback[-1]})
+    for c in ("close", "pct_chg", "vol", "high", "low", "amount", "turnover_rate_f"):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    df["trade_date"] = df["trade_date"].astype(str)
+    df["abs_ret"] = df["pct_chg"].abs()
+    df["sign1"] = np.sign(df["pct_chg"])
+    df["next_ret"] = df.groupby("ts_code")["pct_chg"].shift(-1)
+    g = df.groupby("ts_code", sort=False)
+    df["vol_ma5"] = g["vol"].transform(lambda x: x.rolling(5).mean())
+    df["pv_sync_d"] = df["sign1"] * (df["vol"] / df["vol_ma5"] - 1)
+    df["pv_sync20"] = g["pv_sync_d"].transform(lambda x: x.rolling(20).mean())
+    df["illiq_d"] = df["abs_ret"] / df["amount"].replace(0, np.nan) * 1e9
+    df["amihud3"] = g["illiq_d"].transform(lambda x: x.rolling(3).mean())
+    df["amt_ma5"] = g["amount"].transform(lambda x: x.rolling(5).mean())
+    df["amt_ma20"] = g["amount"].transform(lambda x: x.rolling(20).mean())
+    df["ret_10"] = g["close"].pct_change(10, fill_method=None)
+    df["vw_mom10"] = df["ret_10"] * (df["amt_ma5"] / df["amt_ma20"] - 1)
+
+    todo_s = {str(d) for d in todo}
+    cur = df[df["trade_date"].isin(todo_s)].dropna(
+        subset=["pv_sync20", "amihud3", "vw_mom10"]).copy()
+    signs = {"pv_sync20": -1, "amihud3": +1, "vw_mom10": -1, "turnover_rate_f": -1}
+    cur["score"] = sum(
+        sg * cur.groupby("trade_date")[col].rank(pct=True)
+        for col, sg in signs.items()) / len(signs)
+    out = cur[["ts_code", "trade_date", "score", "pct_chg", "next_ret"]].copy()
+    out["pct_chg"] = out["pct_chg"].astype(float)
+    out["next_ret"] = out["next_ret"].astype(float)
+    out["trade_date"] = pd.to_datetime(out["trade_date"]).dt.date
+    n = _delete_insert("pv_rank", out,
+                       "trade_date BETWEEN :lo AND :hi",
+                       {"lo": todo[0], "hi": todo[-1]})
+
+    # 回填前一交易日的 next_ret（新交易日到来后才能知道）
+    if i > 0:
+        prev = dates[i - 1]
+        first_rows = df[df["trade_date"] == str(first)][["ts_code", "pct_chg"]] \
+            .rename(columns={"pct_chg": "next_ret"})
+        from sqlalchemy.dialects.mysql import insert as mysql_insert
+        from app.models.pv_rank import PvRank
+        stmt = mysql_insert(PvRank.__table__).values([
+            {"ts_code": r.ts_code, "trade_date": prev, "score": None,
+             "pct_chg": None,
+             "next_ret": None if pd.isna(r.next_ret) else round(float(r.next_ret), 4)}
+            for r in first_rows.itertuples()])
+        stmt = stmt.on_duplicate_key_update(next_ret=stmt.inserted.next_ret)
+        with engine.begin() as conn:
+            conn.execute(stmt)
+        print(f"[pvrank] 已回填 {prev} 的次日收益")
+    print(f"[OK] pv_rank 覆盖至 {todo[-1]}，本次 {n:,} 行，用时 {time.time()-t0:.0f}s")
+
 
 def recompute_sentiment(start=None):
     """从底层数据表聚合重算 market_sentiment（start 仅限定落库范围）。"""
@@ -524,6 +614,8 @@ def main():
     with_common(sub.add_parser("update", help="每日增量同步（全量）"))
     p_sent = with_common(sub.add_parser("sentiment", help="重算市场情绪表"))
     p_sent.add_argument("--start", default=None, help="仅重算该日期起（YYYYMMDD）")
+    p_pv = with_common(sub.add_parser("pvrank", help="重建量价综合分排名表"))
+    p_pv.add_argument("--full", action="store_true", help="全量重建（默认增量）")
 
     args = parser.parse_args()
 
@@ -538,6 +630,8 @@ def main():
         s = (date(int(args.start[:4]), int(args.start[4:6]), int(args.start[6:8]))
              if args.start else None)
         recompute_sentiment(s)
+    elif args.cmd == "pvrank":
+        recompute_pv_rank(full=args.full)
     else:
         {"cal": sync_cal, "basic": sync_basic,
          "index": lambda: sync_index(full=args.full),

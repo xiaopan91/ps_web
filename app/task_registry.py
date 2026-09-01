@@ -25,6 +25,17 @@ TASKS = [
         "duration": "约4-6分钟", "long": False,
     },
     {
+        "id": "pvrank", "name": "重建量价因子排名表",
+        "desc": "重算全市场量价综合分（个股预测排名页数据源，增量）",
+        "script": "sync_data.py", "args": ["pvrank"],
+        "params": [
+            {"key": "full", "label": "全量重建",
+             "type": "select", "choices": ["增量", "全量"],
+             "required": False, "flag_map": {"增量": "", "全量": "--full"}},
+        ],
+        "duration": "约1-3分钟", "long": False,
+    },
+    {
         "id": "basic", "name": "同步股票基本信息",
         "desc": "在市股票清单（名称/行业），整表刷新",
         "script": "sync_data.py", "args": ["basic"],

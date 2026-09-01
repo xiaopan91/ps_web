@@ -162,6 +162,38 @@ def rank(date: str = Query(pattern=r"^\d{4}-\d{2}-\d{2}$")):
     # 次一交易日（用于次日涨跌列）
     i = opens.index(actual)
     next_day = opens[i + 1] if i + 1 < len(opens) else None
+
+    # ---- 快路径：pv_rank 预计算表（每日流水线/ pvrank 任务维护） ----
+    rows_q = pd.read_sql(text(
+        "SELECT r.ts_code, r.score, r.pct_chg, r.next_ret, b.name, b.industry "
+        "FROM pv_rank r LEFT JOIN stock_basic b ON b.ts_code = r.ts_code "
+        "WHERE r.trade_date = :d ORDER BY r.score DESC"),
+        engine, params={"d": actual})
+    if not rows_q.empty:
+        rows = [{"rank": i + 1,
+                 "ts_code": r.ts_code,
+                 "name": r.name if isinstance(r.name, str) else r.ts_code,
+                 "industry": r.industry if isinstance(r.industry, str) else None,
+                 "pct_chg": None if pd.isna(r.pct_chg) else round(float(r.pct_chg), 2),
+                 "score": round(float(r.score), 4),
+                 "next_ret": None if (r.next_ret is None or pd.isna(r.next_ret))
+                             else round(float(r.next_ret), 2)}
+                for i, r in enumerate(rows_q.itertuples())]
+        k = max(1, len(rows) // 10)
+        top_next = [x["next_ret"] for x in rows[:k] if x["next_ret"] is not None]
+        all_next = [x["next_ret"] for x in rows if x["next_ret"] is not None]
+        payload = {
+            "date": actual, "next_day": next_day, "total": len(rows),
+            "top10_next_avg": round(float(np.mean(top_next)), 2) if top_next else None,
+            "market_next_avg": round(float(np.mean(all_next)), 2) if all_next else None,
+            "rows": rows,
+        }
+        if len(_RANK_CACHE) > 120:
+            _RANK_CACHE.pop(next(iter(_RANK_CACHE)))
+        _RANK_CACHE[date] = payload
+        return _clean(payload)
+    # ---- 慢路径：实时计算 ----
+
     # 取数窗口：actual 往前 60 个交易日（含），到 next_day（如有）
     start = opens[max(0, i - 59)]
     end = next_day or actual

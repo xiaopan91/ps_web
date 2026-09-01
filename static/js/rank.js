@@ -12,6 +12,9 @@ const app = createApp({
     const stats = ref(null);
     const keyword = ref("");
     const onlyST = ref(false);
+    const showBJ = ref(true);
+    const showCYB = ref(true);
+    const showKCB = ref(true);
     const page = ref(1);
     const sortKey = ref("rank");
     const sortAsc = ref(true);
@@ -32,8 +35,6 @@ const app = createApp({
         }
         const d = await res.json();
         rows.value = d.rows;
-        stats.value = { total: d.total, top10_next_avg: d.top10_next_avg,
-                        market_next_avg: d.market_next_avg };
         actual.value = d.date;
         page.value = 1;
         const p = new URLSearchParams({ date: date.value });
@@ -53,6 +54,9 @@ const app = createApp({
                               (x.name || "").toUpperCase().includes(k) ||
                               (x.industry || "").toUpperCase().includes(k));
       if (!onlyST.value) r = r.filter(x => !(x.name || "").includes("ST"));
+      if (!showBJ.value) r = r.filter(x => !x.ts_code.endsWith(".BJ"));
+      if (!showCYB.value) r = r.filter(x => !x.ts_code.startsWith("300"));
+      if (!showKCB.value) r = r.filter(x => !x.ts_code.startsWith("688"));
       if (sortKey.value === "rank") {
         r = [...r].sort((a, b) => sortAsc.value ? a.rank - b.rank : b.rank - a.rank);
       } else {
@@ -76,8 +80,25 @@ const app = createApp({
       page.value = 1;
     }
 
+    // 统计卡：跟随板块/ST 过滤实时重算（不含关键词筛选）；无次日数据的日期显示空
+    const statsLive = computed(() => {
+      let r = rows.value;
+      if (!onlyST.value) r = r.filter(x => !(x.name || "").includes("ST"));
+      if (!showBJ.value) r = r.filter(x => !x.ts_code.endsWith(".BJ"));
+      if (!showCYB.value) r = r.filter(x => !x.ts_code.startsWith("300"));
+      if (!showKCB.value) r = r.filter(x => !x.ts_code.startsWith("688"));
+      const withNext = r.filter(x => x.next_ret != null)
+                        .sort((a, b) => b.score - a.score);
+      if (!withNext.length) return null;
+      const k = Math.max(1, Math.ceil(withNext.length / 10));
+      const top = withNext.slice(0, k).map(x => x.next_ret);
+      const all = withNext.map(x => x.next_ret);
+      const avg = a => +(a.reduce((s, v) => s + v, 0) / a.length).toFixed(2);
+      return { total: r.length, top10_next_avg: avg(top),
+               market_next_avg: avg(all) };
+    });
     const excess = computed(() => {
-      const s = stats.value;
+      const s = statsLive.value;
       if (!s || s.top10_next_avg == null || s.market_next_avg == null) return null;
       return +(s.top10_next_avg - s.market_next_avg).toFixed(2);
     });
@@ -94,7 +115,8 @@ const app = createApp({
       if (date.value) load();
     });
 
-    return { date, actual, loading, slow, error, rows, stats, keyword, onlyST,
+    return { date, actual, loading, slow, error, rows, stats: statsLive, filtered,
+             keyword, onlyST, showBJ, showCYB, showKCB,
              page, totalPages, paged, sortBy, load, excess };
   },
 });

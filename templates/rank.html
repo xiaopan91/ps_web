@@ -84,12 +84,24 @@
       <!-- 排名表 -->
       <div class="card" v-if="rows.length"><div class="card-body">
         <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
-          <h6 class="card-title mb-0">因子排名 <span class="text-muted small fw-normal">({{ rows.length }} 只，点表头排序)</span></h6>
+          <h6 class="card-title mb-0">因子排名 <span class="text-muted small fw-normal">({{ filtered.length }} 只，点表头排序)</span></h6>
           <input class="form-control form-control-sm" style="width:200px;" v-model="keyword"
                  placeholder="筛选代码/名称/行业">
           <div class="form-check form-switch text-muted small">
             <input class="form-check-input" type="checkbox" v-model="onlyST" id="stsw">
             <label class="form-check-label" for="stsw">含 ST</label>
+          </div>
+          <div class="form-check form-switch text-muted small">
+            <input class="form-check-input" type="checkbox" v-model="showBJ" id="bjsw">
+            <label class="form-check-label" for="bjsw">北交所BJ</label>
+          </div>
+          <div class="form-check form-switch text-muted small">
+            <input class="form-check-input" type="checkbox" v-model="showCYB" id="cybsw">
+            <label class="form-check-label" for="cybsw">创业板300</label>
+          </div>
+          <div class="form-check form-switch text-muted small">
+            <input class="form-check-input" type="checkbox" v-model="showKCB" id="kcbsw">
+            <label class="form-check-label" for="kcbsw">科创板688</label>
           </div>
           <div class="ms-auto small text-muted">第 {{ page }} / {{ totalPages }} 页</div>
           <nav>

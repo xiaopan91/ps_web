@@ -73,8 +73,26 @@ def sentiment_page():
 
 
 @app.get("/predict/pvfactor", include_in_schema=False)
+def pvfactor_redirect(request: Request):
+    """旧地址重定向到 /stockpredict/pvscore。"""
+    return RedirectResponse("/stockpredict/pvscore", status_code=307)
+
+
+@app.get("/stockpredict", include_in_schema=False)
+def stockpredict_page():
+    """个股预测容器页。"""
+    return FileResponse(TEMPLATES_DIR / "stockpredict.html")
+
+
+@app.get("/stockpredict/rank", include_in_schema=False)
+def pvfactor_rank_page():
+    """量价因子排名页（任意日期全市场排序）。"""
+    return FileResponse(TEMPLATES_DIR / "rank.html")
+
+
+@app.get("/stockpredict/pvscore", include_in_schema=False)
 def pvfactor_page():
-    """量价综合分页（宏观预测下）。"""
+    """量价综合分回测页（净值/滚动IC）。"""
     return FileResponse(TEMPLATES_DIR / "pvfactor.html")
 
 

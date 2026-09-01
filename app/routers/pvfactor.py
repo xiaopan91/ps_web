@@ -11,7 +11,7 @@ from datetime import timedelta
 
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import text
 
 from app.database import engine
@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/pvfactor", tags=["pvfactor"])
 DAYS = {"90": 90, "250": 250, "750": 750}
 _CACHE = {}  # days -> (computed_at, payload)
 TTL = 1800
+_RANK_CACHE = {}  # date -> payload（按日期排名，上限 120 个日期）
 
 
 def _clean(obj):
@@ -135,3 +136,101 @@ def overview(days: str = Query(default="250"), refresh: int = 0):
         payload = _clean(_compute(n, need_top=not fresh))
         _CACHE[key] = (time.time(), payload)
     return payload
+
+
+@router.get("/rank")
+def rank(date: str = Query(pattern=r"^\d{4}-\d{2}-\d{2}$")):
+    """任意交易日全市场合成因子排名（含次日涨跌，研究验证用）。"""
+    date = date.strip()
+    if date in _RANK_CACHE:
+        return _RANK_CACHE[date]
+
+    with engine.connect() as conn:
+        last_data = str(conn.execute(text(
+            "SELECT MAX(trade_date) FROM daily_bar")).scalar())
+        opens = [str(r[0]) for r in conn.execute(text(
+            "SELECT cal_date FROM trade_cal WHERE exchange='SSE' AND is_open=1 "
+            "AND cal_date <= :d ORDER BY cal_date"), {"d": last_data})]
+    if not opens:
+        raise HTTPException(404, "无交易日历数据")
+    actual = min(date, last_data)
+    if actual not in opens:
+        opens_lt = [d for d in opens if d <= actual]
+        actual = opens_lt[-1] if opens_lt else None
+    if not actual:
+        raise HTTPException(404, f"{date} 之前无行情数据")
+    # 次一交易日（用于次日涨跌列）
+    i = opens.index(actual)
+    next_day = opens[i + 1] if i + 1 < len(opens) else None
+    # 取数窗口：actual 往前 60 个交易日（含），到 next_day（如有）
+    start = opens[max(0, i - 59)]
+    end = next_day or actual
+
+    df = pd.read_sql(text(
+        "SELECT d.ts_code, d.trade_date, d.close, d.pct_chg, d.vol, d.high, d.low, "
+        "       d.amount, b.name, b.industry, b2.turnover_rate_f "
+        "FROM daily_bar d LEFT JOIN stock_basic b ON b.ts_code = d.ts_code "
+        "LEFT JOIN daily_basic b2 ON b2.ts_code = d.ts_code AND b2.trade_date = d.trade_date "
+        "WHERE d.trade_date BETWEEN :s AND :e ORDER BY d.ts_code, d.trade_date"),
+        engine, params={"s": start, "e": end})
+    if df.empty:
+        raise HTTPException(404, f"{actual} 无行情数据")
+    for c in ("close", "pct_chg", "vol", "high", "low", "amount", "turnover_rate_f"):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    df["trade_date"] = df["trade_date"].astype(str)
+    df["abs_ret"] = df["pct_chg"].abs()
+    df["sign1"] = np.sign(df["pct_chg"])
+    g = df.groupby("ts_code", sort=False)
+    df["vol_ma5"] = g["vol"].transform(lambda x: x.rolling(5).mean())
+    df["pv_sync_d"] = df["sign1"] * (df["vol"] / df["vol_ma5"] - 1)
+    df["pv_sync20"] = g["pv_sync_d"].transform(lambda x: x.rolling(20).mean())
+    df["illiq_d"] = df["abs_ret"] / df["amount"].replace(0, np.nan) * 1e9
+    df["amihud3"] = g["illiq_d"].transform(lambda x: x.rolling(3).mean())
+    df["amt_ma5"] = g["amount"].transform(lambda x: x.rolling(5).mean())
+    df["amt_ma20"] = g["amount"].transform(lambda x: x.rolling(20).mean())
+    df["ret_10"] = g["close"].pct_change(10, fill_method=None)
+    df["vw_mom10"] = df["ret_10"] * (df["amt_ma5"] / df["amt_ma20"] - 1)
+
+    cur = df[df["trade_date"] == actual].copy()
+    signs = {"pv_sync20": -1, "amihud3": +1, "vw_mom10": -1,
+             "turnover_rate_f": -1}
+    parts = []
+    for col, sg in signs.items():
+        if cur[col].notna().sum() > 100:
+            parts.append(sg * cur[col].rank(pct=True))
+    if not parts:
+        raise HTTPException(404, f"{actual} 因子数据不足")
+    cur["comp"] = sum(parts) / len(parts)
+
+    # 次日涨跌（仅当存在次一交易日数据）
+    nxt = None
+    if next_day:
+        nxt = df[df["trade_date"] == next_day][["ts_code", "pct_chg"]] \
+            .rename(columns={"pct_chg": "next_ret"})
+    cur = cur.merge(nxt, on="ts_code", how="left") if nxt is not None else \
+        cur.assign(next_ret=np.nan)
+    cur = cur.dropna(subset=["comp"]).sort_values("comp", ascending=False)
+
+    rows = [{"rank": i + 1,
+             "ts_code": r.ts_code,
+             "name": r.name if isinstance(r.name, str) else r.ts_code,
+             "industry": r.industry if isinstance(r.industry, str) else None,
+             "pct_chg": None if pd.isna(r.pct_chg) else round(float(r.pct_chg), 2),
+             "score": round(float(r.comp), 4),
+             "next_ret": None if (next_day is None or pd.isna(r.next_ret))
+                         else round(float(r.next_ret), 2)}
+            for i, r in enumerate(cur.itertuples())]
+    top_next = [r["next_ret"] for r in rows[:max(1, len(rows) // 10)]
+                if r["next_ret"] is not None]
+    all_next = [r["next_ret"] for r in rows if r["next_ret"] is not None]
+    payload = {
+        "date": actual, "next_day": next_day if next_day and next_day <= last_data else None,
+        "total": len(rows),
+        "top10_next_avg": round(float(np.mean(top_next)), 2) if top_next else None,
+        "market_next_avg": round(float(np.mean(all_next)), 2) if all_next else None,
+        "rows": rows,
+    }
+    if len(_RANK_CACHE) > 120:
+        _RANK_CACHE.pop(next(iter(_RANK_CACHE)))
+    _RANK_CACHE[date] = payload
+    return _clean(payload)

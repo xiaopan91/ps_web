@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>量价因子排名 · ps_web</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    body { background: #f5f6f8; }
+    .up { color: #ef4444; } .down { color: #22c55e; }
+    .card { border: none; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .metric-val { font-size: 1.5rem; font-weight: 700; }
+    table.sorted th { cursor: pointer; user-select: none; white-space: nowrap; }
+    table.sorted th:hover { background: #eef1f4; }
+    .sticky-head th { position: sticky; top: 0; background: #fff; z-index: 5; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <nav class="navbar navbar-dark bg-dark">
+      <div class="container-fluid d-flex align-items-center">
+        <div class="d-flex align-items-center gap-3">
+          <a class="navbar-brand mb-0 h1" href="/">首页</a>
+          <a class="app-nav" href="/stock">个股行情</a>
+          <a class="app-nav" href="/index">指数行情</a>
+          <a class="app-nav active" href="/stockpredict">个股预测</a>
+          <a class="app-nav" href="/predict">宏观预测</a>
+          <a class="app-nav" href="/strategy">买卖策略</a>
+        </div>
+        <a class="app-nav ms-auto" href="/tasks">任务中心</a>
+      </div>
+    </nav>
+
+    <main class="container my-3">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+        <a class="text-muted small text-decoration-none" href="/stockpredict">← 个股预测</a>
+        <h5 class="mb-0 ms-1">量价因子排名</h5>
+        <span class="text-muted small info-tip" data-tip="四因子合成（量价同步度20日 / Amihud3日 / 量确认动量10日 / 换手率，按各自 IC 方向调整后截面等权）。因子仅用当日及以前数据计算。">因子口径</span>
+      </div>
+
+      <!-- 日期选择 -->
+      <div class="card mb-3"><div class="card-body py-2">
+        <form class="d-flex flex-wrap align-items-center gap-3" @submit.prevent="load">
+          <div class="d-flex align-items-center gap-2">
+            <label class="text-muted small mb-0">交易日</label>
+            <input type="date" class="form-control form-control-sm" style="width:auto;"
+                   v-model="date" min="2016-02-04">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" :disabled="loading">
+            {{ loading ? '计算中…' : '查询' }}</button>
+          <span class="text-muted small" v-if="actual && actual !== date">（{{ actual }} 交易日）</span>
+          <span class="text-muted small" v-if="loading && slow">全市场截面计算中，约数秒…</span>
+          <span class="text-danger small" v-if="error">{{ error }}</span>
+        </form>
+      </div></div>
+
+      <!-- 统计卡 -->
+      <div class="row g-3 mb-3" v-if="stats">
+        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+          <div class="text-muted small">覆盖股票</div>
+          <div class="metric-val">{{ stats.total.toLocaleString() }}</div>
+        </div></div></div>
+        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+          <div class="text-muted small">Top10% 次日均涨</div>
+          <div class="metric-val up" v-if="stats.top10_next_avg != null">+{{ stats.top10_next_avg }}%</div>
+          <div class="metric-val text-muted" v-else>—</div>
+        </div></div></div>
+        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+          <div class="text-muted small">市场次日均涨</div>
+          <div class="metric-val" v-if="stats.market_next_avg != null"
+               :class="stats.market_next_avg >= 0 ? 'up' : 'down'">
+            {{ stats.market_next_avg >= 0 ? '+' : '' }}{{ stats.market_next_avg }}%</div>
+          <div class="metric-val text-muted" v-else>—</div>
+        </div></div></div>
+        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+          <div class="text-muted small">Top10% 超额</div>
+          <div class="metric-val" v-if="excess != null"
+               :class="excess >= 0 ? 'up' : 'down'">{{ excess >= 0 ? '+' : '' }}{{ excess }}pp</div>
+          <div class="metric-val text-muted" v-else>—</div>
+        </div></div></div>
+      </div>
+
+      <!-- 排名表 -->
+      <div class="card" v-if="rows.length"><div class="card-body">
+        <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+          <h6 class="card-title mb-0">因子排名 <span class="text-muted small fw-normal">({{ rows.length }} 只，点表头排序)</span></h6>
+          <input class="form-control form-control-sm" style="width:200px;" v-model="keyword"
+                 placeholder="筛选代码/名称/行业">
+          <div class="form-check form-switch text-muted small">
+            <input class="form-check-input" type="checkbox" v-model="onlyST" id="stsw">
+            <label class="form-check-label" for="stsw">含 ST</label>
+          </div>
+          <div class="ms-auto small text-muted">第 {{ page }} / {{ totalPages }} 页</div>
+          <nav>
+            <ul class="pagination pagination-sm mb-0">
+              <li class="page-item" :class="{disabled: page <= 1}"><a class="page-link" href="#" @click.prevent="page--">‹</a></li>
+              <li class="page-item" :class="{disabled: page >= totalPages}"><a class="page-link" href="#" @click.prevent="page++">›</a></li>
+            </ul>
+          </nav>
+        </div>
+        <div class="table-responsive" style="max-height: 560px; overflow-y: auto;">
+          <table class="table table-sm table-hover sorted sticky-head mb-0">
+            <thead>
+              <tr>
+                <th @click="sortBy('rank')">排名</th>
+                <th @click="sortBy('ts_code')">代码</th>
+                <th>名称</th>
+                <th>行业</th>
+                <th class="text-end" @click="sortBy('pct_chg')">当日涨跌%</th>
+                <th class="text-end" @click="sortBy('score')">因子值</th>
+                <th class="text-end" @click="sortBy('next_ret')">次日涨跌%</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in paged" :key="r.ts_code">
+                <td>{{ r.rank }}</td>
+                <td>{{ r.ts_code }}</td>
+                <td><strong>{{ r.name }}</strong></td>
+                <td class="text-muted small">{{ r.industry }}</td>
+                <td class="text-end" :class="r.pct_chg >= 0 ? 'up' : 'down'">{{ r.pct_chg ?? '—' }}</td>
+                <td class="text-end">{{ r.score.toFixed(4) }}</td>
+                <td class="text-end" v-if="r.next_ret != null"
+                    :class="r.next_ret >= 0 ? 'up' : 'down'">{{ r.next_ret >= 0 ? '+' : '' }}{{ r.next_ret }}</td>
+                <td class="text-end text-muted" v-else>—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="text-muted small mt-2">次日涨跌仅作因子有效性研究对照（最新交易日无次日数据）。</div>
+      </div></div>
+    </main>
+  </div>
+
+  <script src="/static/vendor/vue/vue.global.prod.js"></script>
+  <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/rank.js"></script>
+</body>
+</html>

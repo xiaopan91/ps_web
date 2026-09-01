@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>个股预测 · ps_web</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    body { background: #f5f6f8; }
+    .scheme-card {
+      display: block; text-decoration: none; color: inherit;
+      border: none; border-radius: .75rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      transition: all .2s ease;
+    }
+    .scheme-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 24px rgba(0,0,0,.14);
+    }
+    .scheme-big { font-size: 2.2rem; font-weight: 700; line-height: 1.2; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <nav class="navbar navbar-dark bg-dark">
+      <div class="container-fluid d-flex align-items-center">
+        <div class="d-flex align-items-center gap-3">
+          <a class="navbar-brand mb-0 h1" href="/">首页</a>
+          <a class="app-nav" href="/stock">个股行情</a>
+          <a class="app-nav" href="/index">指数行情</a>
+          <a class="app-nav active" href="/stockpredict">个股预测</a>
+          <a class="app-nav" href="/predict">宏观预测</a>
+          <a class="app-nav" href="/strategy">买卖策略</a>
+        </div>
+        <a class="app-nav ms-auto" href="/tasks">任务中心</a>
+      </div>
+    </nav>
+
+    <main class="container my-4">
+      <h4 class="mb-1">个股预测</h4>
+      <p class="text-muted small mb-4">个股级别的因子与预测工具，点击卡片进入</p>
+
+      <div class="row g-4">
+        <div class="col-md-6 col-lg-4">
+          <a class="card scheme-card h-100" href="/stockpredict/rank">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h6 class="card-title mb-1">量价因子排名</h6>
+                  <span class="badge bg-secondary" style="font-size:.72rem">四因子合成 · 任意日期</span>
+                </div>
+                <span class="scheme-big">⇅</span>
+              </div>
+              <p class="card-text text-muted small mt-2 mb-2">
+                选任意交易日，计算当日全市场所有股票的量价综合分（量价同步度/Amihud/
+                量确认动量/换手率），按分值排序展示，并可对照次日涨跌验证。
+              </p>
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted small">12 年样本外 IC 全正</span>
+                <span class="text-primary small">进入 →</span>
+              </div>
+            </div>
+          </a>
+        </div>
+        <div class="col-md-6 col-lg-4">
+          <a class="card scheme-card h-100" href="/stockpredict/pvscore">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h6 class="card-title mb-1">量价综合分 · 回测</h6>
+                  <span class="badge bg-secondary" style="font-size:.72rem">净值 · 滚动IC</span>
+                </div>
+                <span class="scheme-big" style="color:#3b82f6">IC</span>
+              </div>
+              <p class="card-text text-muted small mt-2 mb-2">
+                同一因子的组合回测视图：多头 Top10% 净值 vs 市场等权基准、
+                滚动 60 日截面 IC 健康度曲线。
+              </p>
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted small">ICIR 0.50 · 样本外验证</span>
+                <span class="text-primary small">进入 →</span>
+              </div>
+            </div>
+          </a>
+        </div>
+        <!-- 后续新增的个股预测工具在这里加一块卡片 -->
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/vendor/vue/vue.global.prod.js"></script>
+  <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script>
+    createApp({ setup() { return {}; } }).mount("#app");
+  </script>
+</body>
+</html>

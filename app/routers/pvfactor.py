@@ -188,10 +188,11 @@ def rank(date: str = Query(pattern=r"^\d{4}-\d{2}-\d{2}$")):
             "market_next_avg": round(float(np.mean(all_next)), 2) if all_next else None,
             "rows": rows,
         }
+        payload = _clean(payload)
         if len(_RANK_CACHE) > 120:
             _RANK_CACHE.pop(next(iter(_RANK_CACHE)))
         _RANK_CACHE[date] = payload
-        return _clean(payload)
+        return payload
     # ---- 慢路径：实时计算 ----
 
     # 取数窗口：actual 往前 60 个交易日（含），到 next_day（如有）

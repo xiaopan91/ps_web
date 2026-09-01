@@ -50,12 +50,12 @@
               <div class="d-flex justify-content-between align-items-start">
                 <div>
                   <h6 class="card-title mb-1">市场情绪</h6>
-                  <span class="badge bg-secondary scheme-tag">八因子合成 · 日频</span>
+                  <span class="badge bg-secondary scheme-tag">七因子合成 · 日频</span>
                 </div>
                 <span class="scheme-score" :style="{color: scoreColor}">{{ score ?? '—' }}</span>
               </div>
               <p class="card-text text-muted small mt-2 mb-2">
-                涨跌比、涨停连板、量能换手、两融北向、离散度八因子按历史分位数合成的市场温度计（0-100）。
+                涨跌比、涨停连板、量能换手、两融、离散度七因子按历史分位数合成的市场温度计（0-100）。
               </p>
               <div id="spark" class="scheme-spark"></div>
               <div class="d-flex justify-content-between align-items-center mt-1">
@@ -66,28 +66,6 @@
           </a>
         </div>
         <!-- 后续新增的预测方案在这里加一块卡片 -->
-        <div class="col-md-6 col-lg-4">
-          <a class="card scheme-card h-100" href="/predict/north">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <h6 class="card-title mb-1">北向 / 成交额</h6>
-                  <span class="badge bg-secondary scheme-tag">外资方向 · 日频</span>
-                </div>
-                <span class="scheme-score" :style="{color: ratioColor}">{{ ratio ?? '—' }}</span>
-              </div>
-              <p class="card-text text-muted small mt-2 mb-2">
-                北向净买入占两市成交额比例（bp）。回测 IC +0.058、11 年中 91% 年份同向，
-                是日线因子扫描中质量最高的方向性指标。
-              </p>
-              <div id="spark2" class="scheme-spark"></div>
-              <div class="d-flex justify-content-between align-items-center mt-1">
-                <span class="text-muted small">{{ northZone }} · {{ northDate }}</span>
-                <span class="text-primary small">进入 →</span>
-              </div>
-            </div>
-          </a>
-        </div>
       </div>
     </main>
   </div>

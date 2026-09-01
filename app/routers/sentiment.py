@@ -8,6 +8,7 @@ from app.database import engine
 router = APIRouter(prefix="/api/sentiment", tags=["sentiment"])
 
 # 合成情绪分的因子（列名, 中文名, 是否反向）
+# 2024-08-19 起北向净买为推算口径，与此前数据不可比，已从合成分中移除
 FACTORS = [
     ("breadth", "涨跌比", False),
     ("limit_up", "涨停数", False),
@@ -15,7 +16,6 @@ FACTORS = [
     ("amount_ratio", "量能比", False),
     ("avg_turnover_f", "换手率", False),
     ("margin_net_buy", "两融净买", False),
-    ("north_net", "北向净买", False),
     ("std_pct", "离散度", True),  # 反向：分歧越大越冷
 ]
 

@@ -5,7 +5,7 @@ const UP = "#ef4444", DOWN = "#22c55e", BLUE = "#3b82f6", GRAY = "#94a3b8";
 const FACTOR_LABELS = {
   breadth: "涨跌比", limit_up: "涨停数", max_streak: "连板高度",
   amount_ratio: "量能比", avg_turnover_f: "换手率", margin_net_buy: "两融净买",
-  north_net: "北向净买", std_pct: "离散度(反)",
+  std_pct: "离散度(反)",
 };
 
 const app = createApp({
@@ -102,8 +102,6 @@ const app = createApp({
          "换手率：全市场流通盘换手率均值，衡量交投活跃度（卡片显示当日总成交额）"],
         ["margin_net_buy", `两融余额 ${l.margin_balance_yi ?? '—'} 亿`,
          "两融净买入：融资买入额减偿还额（杠杆资金当日净流入），余额为其存量；杠杆加得越猛情绪越高"],
-        ["north_net", `北向 ${l.north_net_yi != null ? (l.north_net_yi>0?'+':'')+l.north_net_yi : '—'} 亿`,
-         "北向净买：沪深股通（外资）当日净买入金额，代表外资方向"],
         ["std_pct", `中位涨跌 ${l.median_pct != null ? (l.median_pct>0?'+':'')+l.median_pct+'%' : '—'}`,
          "离散度(反)：当日全市场个股涨跌幅的标准差，越大说明个股表现分化越严重、市场分歧越大；反向计入分数（分歧大→扣分）"],
       ];

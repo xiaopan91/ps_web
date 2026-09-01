@@ -81,7 +81,7 @@
       <div class="row g-3 mb-3">
         <div class="col-md-3">
           <div class="card h-100"><div class="card-body text-center">
-            <div class="text-muted small info-tip" data-tip="八因子等权合成的市场情绪温度计（0-100）：涨跌比、涨停数、连板高度、量能比、换手率、两融净买、北向净买、离散度，各自按近3年历史分位数标准化后取平均。大于80过热，小于20冰点。">市场情绪分（0-100）</div>
+            <div class="text-muted small info-tip" data-tip="七因子等权合成的市场情绪温度计（0-100）：涨跌比、涨停数、连板高度、量能比、换手率、两融净买、离散度，各自按近3年历史分位数标准化后取平均。大于80过热，小于20冰点。">市场情绪分（0-100）</div>
             <div class="score-big" :style="{color: scoreColor}">{{ snap ? snap.score : '—' }}</div>
             <div class="mt-1" :style="{color: scoreColor}">{{ zoneLabel }}</div>
             <div class="text-muted small mt-1">{{ snap ? snap.trade_date : '' }}</div>

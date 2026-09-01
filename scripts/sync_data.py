@@ -391,7 +391,6 @@ def cmd_update(args):
     else:
         print("[INFO] 日线已最新")
     sync_index()
-    sync_hsgt()
     recompute_sentiment()
 
 

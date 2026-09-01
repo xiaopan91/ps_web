@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>量价综合分 · ps_web</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    body { background: #f5f6f8; }
+    .card { border: none; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .metric-val { font-size: 1.6rem; font-weight: 700; }
+    .info-tip { position: relative; cursor: help; border-bottom: 1px dotted #94a3b8; }
+    .info-tip:hover::after {
+      content: attr(data-tip);
+      position: absolute; left: 0; top: calc(100% + 4px); z-index: 30;
+      background: #1e293b; color: #f1f5f9;
+      font-size: .72rem; line-height: 1.5;
+      padding: .45rem .65rem; border-radius: .375rem;
+      width: 250px; text-align: left;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+    }
+    .chart { width: 100%; height: 300px; }
+    .up { color: #ef4444; } .down { color: #22c55e; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <nav class="navbar navbar-dark bg-dark">
+      <div class="container-fluid d-flex align-items-center">
+        <div class="d-flex align-items-center gap-3">
+          <a class="navbar-brand mb-0 h1" href="/">首页</a>
+          <a class="app-nav" href="/stock">个股行情</a>
+          <a class="app-nav" href="/index">指数行情</a>
+          <a class="app-nav active" href="/predict">宏观预测</a>
+          <a class="app-nav" href="/strategy">买卖策略</a>
+        </div>
+        <a class="app-nav ms-auto" href="/tasks">任务中心</a>
+      </div>
+    </nav>
+
+    <main class="container my-3">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+        <a class="text-muted small text-decoration-none" href="/predict">← 宏观预测</a>
+        <h5 class="mb-0 ms-1">量价综合分</h5>
+        <span class="text-muted small" v-if="latest">{{ latest.trade_date }}</span>
+        <span class="text-muted small" v-if="computing">首次计算中（约半分钟）…</span>
+      </div>
+
+      <!-- 当日指标卡 -->
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+          <div class="text-muted small info-tip" data-tip="近 60 个交易日合成因子截面 IC（因子排名与次日涨幅排名的相关性）的平均值。0.05 上下属于可用水平，样本外 12 年全正。">60日均截面IC</div>
+          <div class="metric-val" :class="latest && latest.ic60 >= 0 ? 'up' : 'down'">
+            {{ latest && latest.ic60 != null ? latest.ic60.toFixed(3) : '—' }}</div>
+        </div></div></div>
+        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+          <div class="text-muted small info-tip" data-tip="每日买入因子值最高 10% 的股票、按次日收盘等权卖出的组合，在本窗口内的年化收益。费前、含隔夜跳空，实盘会打折。">多头年化(费前)</div>
+          <div class="metric-val up">{{ latest && latest.ann_top != null ? '+' + latest.ann_top + '%' : '—' }}</div>
+        </div></div></div>
+        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+          <div class="text-muted small">多头日胜率</div>
+          <div class="metric-val">{{ latest && latest.win_rate != null ? latest.win_rate + '%' : '—' }}</div>
+        </div></div></div>
+        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+          <div class="text-muted small">当日覆盖股票</div>
+          <div class="metric-val">{{ latest ? latest.n_stocks.toLocaleString() : '—' }}</div>
+        </div></div></div>
+      </div>
+
+      <!-- 区间切换 -->
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <div class="btn-group btn-group-sm">
+          <button v-for="d in dayOptions" :key="d.k" class="btn" type="button"
+                  :class="days === d.k ? 'btn-primary' : 'btn-outline-primary'"
+                  @click="days = d.k">{{ d.label }}</button>
+        </div>
+        <span class="text-muted small" v-if="loading">加载中…</span>
+        <span class="text-danger small" v-if="error">{{ error }}</span>
+      </div>
+
+      <!-- 图表 -->
+      <div class="row g-3">
+        <div class="col-12"><div class="card"><div class="card-body">
+          <h6 class="card-title mb-3">
+            多头组合净值 × 市场等权基准
+            <span class="text-muted small fw-normal">（每日买因子 Top10%，次日收盘调仓；费前）</span>
+          </h6>
+          <div id="chart-nav" class="chart"></div>
+        </div></div></div>
+        <div class="col-12"><div class="card"><div class="card-body">
+          <h6 class="card-title mb-3">
+            滚动 60 日截面 IC
+            <span class="text-muted small fw-normal">（零轴以上=因子有效）</span>
+          </h6>
+          <div id="chart-ic" class="chart"></div>
+        </div></div></div>
+        <div class="col-12"><div class="card"><div class="card-body">
+          <h6 class="card-title mb-3">当日因子 Top20
+            <span class="text-muted small fw-normal">（按合成因子值排序，仅供研究参考）</span></h6>
+          <table class="table table-sm table-striped mb-0" v-if="topList.length">
+            <thead><tr><th>#</th><th>代码</th><th>名称</th><th>行业</th>
+              <th class="text-end">因子值</th></tr></thead>
+            <tbody>
+              <tr v-for="(s, i) in topList" :key="s.ts_code">
+                <td>{{ i + 1 }}</td>
+                <td>{{ s.ts_code }}</td>
+                <td><strong>{{ s.name }}</strong></td>
+                <td class="text-muted small">{{ s.industry }}</td>
+                <td class="text-end">{{ s.score.toFixed(4) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="text-muted small" v-else>—</div>
+        </div></div></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/vendor/vue/vue.global.prod.js"></script>
+  <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="/static/vendor/echarts/echarts.min.js"></script>
+  <script src="/static/js/pvfactor.js"></script>
+</body>
+</html>

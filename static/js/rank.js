@@ -55,7 +55,7 @@ const app = createApp({
                               (x.industry || "").toUpperCase().includes(k));
       if (!onlyST.value) r = r.filter(x => !(x.name || "").includes("ST"));
       if (!showBJ.value) r = r.filter(x => !x.ts_code.endsWith(".BJ"));
-      if (!showCYB.value) r = r.filter(x => !x.ts_code.startsWith("300"));
+      if (!showCYB.value) r = r.filter(x => !x.ts_code.startsWith("30"));
       if (!showKCB.value) r = r.filter(x => !x.ts_code.startsWith("688"));
       if (sortKey.value === "rank") {
         r = [...r].sort((a, b) => sortAsc.value ? a.rank - b.rank : b.rank - a.rank);
@@ -85,7 +85,7 @@ const app = createApp({
       let r = rows.value;
       if (!onlyST.value) r = r.filter(x => !(x.name || "").includes("ST"));
       if (!showBJ.value) r = r.filter(x => !x.ts_code.endsWith(".BJ"));
-      if (!showCYB.value) r = r.filter(x => !x.ts_code.startsWith("300"));
+      if (!showCYB.value) r = r.filter(x => !x.ts_code.startsWith("30"));
       if (!showKCB.value) r = r.filter(x => !x.ts_code.startsWith("688"));
       const withNext = r.filter(x => x.next_ret != null)
                         .sort((a, b) => b.score - a.score);

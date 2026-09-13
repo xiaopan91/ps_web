@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pandas as pd
 import numpy as np
 import tushare as ts
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from app.config import TUSHARE_TOKEN
 from app.database import Base, engine
@@ -416,15 +416,21 @@ def recompute_pv_rank(full=False):
             "SELECT DISTINCT trade_date FROM pv_rank"))}
     if not dates:
         sys.exit("[错误] daily_bar 无数据")
-    todo = [d for d in dates if str(d) not in have]
+    # 历史最早 60 个交易日滚动窗口不足、因子恒为 NaN，pv_rank 永不覆盖；
+    # 必须按历史位置排除（对 dates 切片而非对 todo 切片），否则 todo[0]
+    # 永远卡在 2016-01-04，把取数窗口和删除范围拖成全表
+    WARM = 60
+    todo = [d for d in dates[WARM:] if str(d) not in have]
     if not todo:
         print("[OK] pv_rank 已最新")
         return
     first = todo[0]
     i = dates.index(first)
+    j = dates.index(todo[-1])
     # 因子需要 20 日滚动 + 缓冲，取数窗口从第一个待算日往前 60 个交易日；
-    # 末尾多取一天（次日的次日收益列用）
-    lookback = dates[max(0, i - 60):i + len(todo) + 1]
+    # 末尾多取一天（次日的次日收益列用）。todo 可能不连续（如散缺），不能按
+    # i + len(todo) 推末尾，必须用 todo[-1] 的真实位置
+    lookback = dates[max(0, i - 60):j + 2]
     print(f"[pvrank] 待算 {len(todo)} 个交易日（{todo[0]} ~ {todo[-1]}），"
           f"取数窗口 {lookback[0]} ~ {lookback[-1]}")
 
@@ -463,9 +469,19 @@ def recompute_pv_rank(full=False):
     out["pct_chg"] = out["pct_chg"].astype(float)
     out["next_ret"] = out["next_ret"].astype(float)
     out["trade_date"] = pd.to_datetime(out["trade_date"]).dt.date
-    n = _delete_insert("pv_rank", out,
-                       "trade_date BETWEEN :lo AND :hi",
-                       {"lo": todo[0], "hi": todo[-1]})
+    # 只删本次真正写出的交易日。todo 里因子不足的日子（dropna 剔除）不会进 out，
+    # 若按 [todo 首, todo 末] 区间删，一次空增量就会清掉整张表（本次 0 行事故根因）
+    n = len(out)
+    del_dates = sorted(set(out["trade_date"]))
+    with engine.begin() as conn:
+        for k in range(0, len(del_dates), 500):
+            conn.execute(
+                text("DELETE FROM pv_rank WHERE trade_date IN :ds")
+                .bindparams(bindparam("ds", expanding=True)),
+                {"ds": del_dates[k:k + 500]})
+        if n:
+            out.to_sql("pv_rank", con=conn, if_exists="append", index=False,
+                       chunksize=1000, method="multi")
 
     # 回填前一交易日的 next_ret（新交易日到来后才能知道）
     if i > 0:

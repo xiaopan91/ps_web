@@ -23,6 +23,20 @@
     .stat-card .card-body { padding: .5rem .75rem; }
     .stat-card .stat-value { font-size: 1.05rem; font-weight: 600; }
     .stat-card .stat-sub { font-size: .72rem; }
+    .fav-pop {
+      position: absolute; top: 100%; right: 0; z-index: 20; min-width: 230px;
+      background: #fff; border: 1px solid #ddd; border-radius: .375rem;
+      box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+    }
+    .fav-item { display: flex; align-items: center; gap: .5rem; padding: .45rem .75rem;
+                cursor: pointer; font-size: .9rem; }
+    .fav-item:hover { background: #f1f3f5; }
+    .fav-chip {
+      display: inline-flex; align-items: center; gap: .4rem; padding: .15rem .6rem;
+      border: 1px solid #dee2e6; border-radius: 2rem; font-size: .82rem;
+      text-decoration: none; color: inherit;
+    }
+    .fav-chip:hover { background: #f1f3f5; }
   </style>
 </head>
 <body>
@@ -70,6 +84,30 @@
           </span>
           <span class="text-muted small">{{ latest.trade_date }}</span>
         </template>
+
+        <!-- 收藏星标 + 分组弹层 -->
+        <div class="position-relative" id="favStar">
+          <button class="btn btn-sm" type="button"
+                  :class="starred ? 'btn-warning' : 'btn-outline-secondary'"
+                  :title="starred ? '已收藏 · 点击管理分组' : '收藏到分组'"
+                  @click.stop="toggleFavPop">
+            {{ starred ? '★' : '☆' }}
+          </button>
+          <div class="fav-pop" v-if="favPopOpen">
+            <label class="fav-item" v-for="g in favGroups" :key="g.id">
+              <input type="checkbox" :checked="g.belongs" @change="toggleGroup(g, $event)">
+              <span>{{ g.name }}</span>
+            </label>
+            <div v-if="!favGroups.length" class="text-muted small p-2">还没有分组，先新建一个</div>
+            <div class="text-danger small px-2" v-if="favErr">{{ favErr }}</div>
+            <div class="d-flex gap-1 p-2 border-top">
+              <input class="form-control form-control-sm" v-model="newGroupName"
+                     placeholder="新分组名" @keydown.enter.prevent="createGroupAndJoin">
+              <button class="btn btn-sm btn-outline-primary" type="button"
+                      @click="createGroupAndJoin">新建</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 区间 + 复权 -->
@@ -86,6 +124,38 @@
         </div>
         <span class="text-muted small" v-if="loading">加载中…</span>
         <span class="text-danger small" v-if="error">{{ error }}</span>
+        <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" @click="favOpen = !favOpen">
+          {{ favOpen ? '▴ 收起收藏' : '▾ 我的收藏' }}
+        </button>
+      </div>
+
+      <!-- 我的收藏面板（折叠） -->
+      <div v-show="favOpen" class="border rounded p-2 px-3 mb-3">
+        <div v-if="!favData.length" class="text-muted small py-1">
+          还没有收藏分组：点股票旁的 ☆ 新建分组并收藏个股，分组支持同名多组归属。
+        </div>
+        <div v-for="g in favData" :key="g.id" class="py-1">
+          <div class="d-flex align-items-center gap-2">
+            <strong class="small">{{ g.name }}</strong>
+            <span class="badge bg-light text-dark">{{ g.count }}</span>
+            <button class="btn btn-sm btn-link text-muted p-0" type="button"
+                    @click="renameGroup(g)">改名</button>
+            <button class="btn btn-sm btn-link text-danger p-0" type="button"
+                    @click="removeGroup(g)">删除</button>
+          </div>
+          <div class="d-flex flex-wrap gap-2 mt-1 mb-1">
+            <a v-for="s in g.members" :key="s.ts_code" href="#" class="fav-chip"
+               @click.prevent="pickFav(s)">
+              <strong>{{ s.name }}</strong>
+              <span class="text-muted">{{ s.ts_code }}</span>
+              <span :class="(s.pct_chg ?? 0) >= 0 ? 'up' : 'down'">
+                {{ s.close != null ? s.close.toFixed(2) : '—' }}
+                {{ s.pct_chg != null ? (s.pct_chg >= 0 ? '+' : '') + s.pct_chg.toFixed(2) + '%' : '' }}
+              </span>
+            </a>
+            <span v-if="!g.members.length" class="text-muted small align-self-center">空分组</span>
+          </div>
+        </div>
       </div>
 
       <div id="chart"></div>
@@ -181,6 +251,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/stock.js?v=20260913-3"></script>
+  <script src="/static/js/stock.js?v=20260913-5"></script>
 </body>
 </html>

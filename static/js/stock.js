@@ -62,6 +62,110 @@ const app = createApp({
       suggests.value = [];
     }
 
+    // ---- 个股收藏（分组，多对多） ----
+    const favOpen = ref(false);
+    const favData = ref([]);        // 面板：全部分组 + 成员快照
+    const favPopOpen = ref(false);
+    const favGroups = ref([]);      // 星标弹层：全部分组 + belongs
+    const favErr = ref("");
+    const newGroupName = ref("");
+
+    const starred = computed(() => favGroups.value.some(g => g.belongs));
+
+    async function loadFavPop() {
+      try {
+        const res = await fetch(`/api/fav/stock_groups?code=${code.value}`);
+        const data = res.ok ? await res.json() : { groups: [] };
+        favGroups.value = data.groups || [];
+      } catch (e) { /* 星标状态加载失败静默 */ }
+    }
+
+    async function loadFavPanel() {
+      try {
+        const res = await fetch("/api/fav/groups");
+        favData.value = res.ok ? await res.json() : [];
+      } catch (e) { /* 面板加载失败静默 */ }
+    }
+
+    function toggleFavPop() {
+      favPopOpen.value = !favPopOpen.value;
+      favErr.value = "";
+      if (favPopOpen.value) loadFavPop();
+    }
+
+    async function toggleGroup(g, ev) {
+      const want = ev.target.checked;
+      g.belongs = want;
+      try {
+        if (want) {
+          await fetch("/api/fav/members", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ group_id: g.id, ts_code: code.value }),
+          });
+        } else {
+          await fetch(`/api/fav/members/${g.id}/${code.value}`, { method: "DELETE" });
+        }
+        if (favOpen.value) loadFavPanel();  // 面板开着就同步刷新
+      } catch (e) {
+        g.belongs = !want;  // 回滚勾选态
+      }
+    }
+
+    async function createGroupAndJoin() {
+      const name = newGroupName.value.trim();
+      if (!name) return;
+      favErr.value = "";
+      try {
+        const res = await fetch("/api/fav/groups", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        if (!res.ok) {
+          const msg = await res.json().catch(() => ({}));
+          favErr.value = msg.detail || `HTTP ${res.status}`;
+          return;
+        }
+        const g = await res.json();
+        newGroupName.value = "";
+        if (code.value) {
+          await fetch("/api/fav/members", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ group_id: g.id, ts_code: code.value }),
+          });
+        }
+        await loadFavPop();
+        if (favOpen.value) loadFavPanel();
+      } catch (e) {
+        favErr.value = e.message || "创建失败";
+      }
+    }
+
+    async function renameGroup(g) {
+      const name = prompt(`把分组「${g.name}」改名为：`, g.name);
+      if (!name || name.trim() === g.name) return;
+      const res = await fetch(`/api/fav/groups/${g.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      if (res.ok) loadFavPanel();
+      else alert((await res.json().catch(() => ({}))).detail || "改名失败");
+    }
+
+    async function removeGroup(g) {
+      if (!confirm(`删除分组「${g.name}」及其 ${g.count} 只收藏？`)) return;
+      await fetch(`/api/fav/groups/${g.id}`, { method: "DELETE" });
+      loadFavPanel();
+      loadFavPop();
+    }
+
+    function pickFav(s) {
+      code.value = s.ts_code;
+      query.value = s.name || s.ts_code;
+    }
+
+    watch(favOpen, open => { if (open) loadFavPanel(); });
+    watch(code, () => { if (favPopOpen.value) loadFavPop(); });
+
     let chart = null;
     let barsCache = [];
 
@@ -447,6 +551,13 @@ const app = createApp({
 
     onMounted(() => {
       load();
+      loadFavPop();   // 星标初始状态
+      document.addEventListener("click", (e) => {
+        if (!favPopOpen.value) return;
+        const t = e.target;
+        if (t.closest && (t.closest(".fav-pop") || t.closest("#favStar"))) return;
+        favPopOpen.value = false;
+      });
       window.addEventListener("resize", () => {
         if (chart) chart.resize();
         resizeAna();
@@ -456,7 +567,10 @@ const app = createApp({
     return { query, suggests, code, range, adjust, info, latest, loading, error,
              ranges, adjusts, onInput, pick,
              anaOpen, anaLoading, anaError, stats, statCards, factor, funda,
-             fundaTiles };
+             fundaTiles,
+             favOpen, favData, favPopOpen, favGroups, favErr, newGroupName,
+             starred, toggleFavPop, toggleGroup, createGroupAndJoin,
+             renameGroup, removeGroup, pickFav };
   },
 });
 

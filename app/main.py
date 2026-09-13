@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import health, index_quotes, pvfactor, sentiment, stock, strategy, tasks
+from app.routers import fav, health, index_quotes, pvfactor, sentiment, stock, strategy, tasks
 from app.task_runner import cleanup_orphans, scheduler_loop
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -35,6 +35,7 @@ app.include_router(sentiment.router)
 app.include_router(strategy.router)
 app.include_router(tasks.router)
 app.include_router(pvfactor.router)
+app.include_router(fav.router)
 
 # 静态资源：/static/css/... /static/js/... /static/vendor/...
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

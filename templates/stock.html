@@ -18,6 +18,11 @@
     .up { color: #ef4444; }
     .down { color: #22c55e; }
     #chart { width: 100%; height: 560px; }
+    .ana-chart { width: 100%; height: 240px; }
+    .ana-card .card-title { font-size: .9rem; }
+    .stat-card .card-body { padding: .5rem .75rem; }
+    .stat-card .stat-value { font-size: 1.05rem; font-weight: 600; }
+    .stat-card .stat-sub { font-size: .72rem; }
   </style>
 </head>
 <body>
@@ -84,12 +89,79 @@
       </div>
 
       <div id="chart"></div>
+
+      <!-- 个股分析区（折叠，懒加载） -->
+      <div class="d-flex flex-wrap align-items-center gap-2 mt-3 mb-2">
+        <button class="btn btn-sm btn-outline-primary" type="button" @click="anaOpen = !anaOpen">
+          {{ anaOpen ? '▴ 收起个股分析' : '▾ 展开个股分析' }}
+        </button>
+        <span class="text-muted small" v-if="anaLoading">分析数据加载中…</span>
+        <span class="text-danger small" v-if="anaError">{{ anaError }}</span>
+        <span class="text-muted small ms-auto" v-if="stats">
+          统计截至 {{ stats.date }} · 区间口径随上方 range 切换
+        </span>
+      </div>
+
+      <div v-show="anaOpen">
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-md-3" v-for="c in statCards" :key="c.label">
+            <div class="card stat-card h-100"><div class="card-body">
+              <div class="text-muted small">{{ c.label }}</div>
+              <div class="stat-value" :class="c.cls">{{ c.value }}</div>
+              <div class="stat-sub text-muted" v-if="c.sub">{{ c.sub }}</div>
+            </div></div>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-lg-6">
+            <div class="card ana-card h-100"><div class="card-body">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="card-title mb-0">量价因子综合分
+                  <span class="text-muted small fw-normal">截面分位 0~1 · 四因子合成</span>
+                </h6>
+                <span class="badge text-bg-primary" v-if="factor && factor.summary">
+                  第 {{ factor.summary.rank }} / {{ factor.summary.total }}
+                </span>
+              </div>
+              <div id="chart-factor" class="ana-chart"></div>
+            </div></div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="card ana-card h-100"><div class="card-body">
+              <h6 class="card-title">波动与位置
+                <span class="text-muted small fw-normal">60日区间位置 × 日振幅</span>
+              </h6>
+              <div id="chart-vol" class="ana-chart"></div>
+              <div class="text-muted small mt-1">
+                注脚（FACTOR_RESEARCH）：低位放量=资金进场，高位放量=出货；贴近60日低点不是抄底信号，是破位阴跌仍在继续的描述。
+              </div>
+            </div></div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="card ana-card h-100"><div class="card-body">
+              <h6 class="card-title">换手与量比
+                <span class="text-muted small fw-normal">流通换手率 × 量比</span>
+              </h6>
+              <div id="chart-turnover" class="ana-chart"></div>
+            </div></div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="card ana-card h-100"><div class="card-body">
+              <h6 class="card-title">估值
+                <span class="text-muted small fw-normal">PE(TTM) × 流通市值（亿元）</span>
+              </h6>
+              <div id="chart-val" class="ana-chart"></div>
+            </div></div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/stock.js"></script>
+  <script src="/static/js/stock.js?v=20260913"></script>
 </body>
 </html>

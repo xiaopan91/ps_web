@@ -127,7 +127,8 @@
             <tbody>
               <tr v-for="r in paged" :key="r.ts_code">
                 <td>{{ r.rank }}</td>
-                <td>{{ r.ts_code }}</td>
+                <td><a :href="`/stock?code=${r.ts_code}`" target="_blank"
+                       class="text-decoration-none">{{ r.ts_code }}</a></td>
                 <td><strong>{{ r.name }}</strong></td>
                 <td class="text-muted small">{{ r.industry }}</td>
                 <td class="text-end" :class="r.pct_chg >= 0 ? 'up' : 'down'">{{ r.pct_chg ?? '—' }}</td>

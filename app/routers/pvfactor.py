@@ -267,3 +267,44 @@ def rank(date: str = Query(pattern=r"^\d{4}-\d{2}-\d{2}$")):
         _RANK_CACHE.pop(next(iter(_RANK_CACHE)))
     _RANK_CACHE[date] = payload
     return _clean(payload)
+
+
+@router.get("/stock")
+def stock_factor(code: str, days: int = Query(500, ge=50, le=2500)):
+    """单股量价综合分历史（pv_rank 表），含最新截面全市场排名。
+
+    score 为当日截面百分位（0~1，越大越靠前），与 /rank 接口同口径。
+    """
+    df = pd.read_sql(text(
+        "SELECT trade_date, score FROM pv_rank "
+        "WHERE ts_code = :c ORDER BY trade_date"),
+        engine, params={"c": code})
+    if df.empty:
+        return {"code": code, "dates": [], "scores": [], "summary": None}
+    df["score"] = pd.to_numeric(df["score"], errors="coerce")
+    df = df.dropna(subset=["score"]).tail(days)
+    if df.empty:
+        return {"code": code, "dates": [], "scores": [], "summary": None}
+
+    dates = df["trade_date"].astype(str).tolist()
+    last_date = dates[-1]
+    last_score = float(df["score"].iloc[-1])
+    with engine.connect() as conn:
+        row = conn.execute(text(
+            "SELECT COUNT(*), COALESCE(SUM(score > :s), 0) FROM pv_rank "
+            "WHERE trade_date = :d"),
+            {"s": last_score, "d": last_date}).fetchone()
+    summary = {
+        "date": last_date,
+        "score": round(last_score, 4),
+        "rank": int(row[1]) + 1,
+        "total": int(row[0]),
+        "hist_mean": round(float(df["score"].mean()), 4),
+        "top10_pct": round(float((df["score"] >= 0.9).mean() * 100), 1),
+    }
+    return {
+        "code": code,
+        "dates": dates,
+        "scores": [round(float(v), 4) for v in df["score"]],
+        "summary": summary,
+    }

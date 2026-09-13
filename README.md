@@ -135,6 +135,8 @@ python scripts/sync_data.py hsgt                       # 北向资金（按年�
 python scripts/sync_data.py backfill --start 20160101  # 回补：日线/复权/换手/两融
 python scripts/sync_data.py update                     # 每日增量（收盘后跑，全量+重算情绪）
 python scripts/sync_data.py sentiment                  # 重算市场情绪表
+python scripts/sync_data.py pvrank                     # 重建量价综合分排名表
+python scripts/sync_data.py fina                       # 财务指标（季频逐只，每季报披露季手动跑）
 ```
 
 - 幂等：按日先删后插，重跑无害；接口限流自动重试等待

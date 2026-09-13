@@ -40,6 +40,9 @@ BASIC_DAILY_COLS = ["ts_code", "trade_date", "turnover_rate", "turnover_rate_f",
                     "volume_ratio", "pe", "circ_mv", "total_mv"]
 MARGIN_COLS = ["trade_date", "exchange_id", "rzye", "rzmre", "rzche",
                "rqye", "rzrqye"]
+FINA_COLS = ["ts_code", "ann_date", "end_date", "update_flag", "eps", "bps",
+             "roe", "grossprofit_margin", "netprofit_margin", "debt_to_assets",
+             "or_yoy", "netprofit_yoy"]
 
 INDICES = [  # 13 只核心/风格指数
     ("000001.SH", "上证指数"), ("399001.SZ", "深证成指"), ("000300.SH", "沪深300"),
@@ -502,6 +505,62 @@ def recompute_pv_rank(full=False):
     print(f"[OK] pv_rank 覆盖至 {todo[-1]}，本次 {n:,} 行，用时 {time.time()-t0:.0f}s")
 
 
+def sync_fina(start_period="20160331"):
+    """同步财务指标（tushare fina_indicator，单股全历史逐只拉取）。
+
+    当前积分档不支持按报告期批量（fina_indicator_vip 需 5000 分），
+    只能逐只调用。三个坑：
+    - 必须显式传 start_date/end_date（不带日期只返回最近 100 行）
+    - 单次调用硬上限 100 行，命中即按公告日窗口对半递归拆分
+    - update_flag 不能当版本选择器：多数报告期只有 '1' 没有 '0'，
+      全版本入库，由查询端按「每期最早公告日」取数（防前视以公告日为准）
+    按股票先删后插，幂等。
+    """
+    import app.models  # noqa: F401  注册 ORM 模型，确保 fina_indicator 表存在
+    print("[fina] 同步财务指标（按个股全历史）...")
+    t0 = time.time()
+    Base.metadata.create_all(engine)
+
+    start = date(int(start_period[:4]), int(start_period[4:6]), int(start_period[6:8]))
+    start_s, end_s = start.strftime("%Y%m%d"), date.today().strftime("%Y%m%d")
+    with engine.connect() as conn:
+        codes = [r[0] for r in conn.execute(text(
+            "SELECT ts_code FROM stock_basic ORDER BY ts_code"))]
+    if not codes:
+        sys.exit("[错误] stock_basic 为空，请先运行: python scripts/sync_data.py basic")
+
+    def fetch_window(c, s_dt, e_dt, depth=0):
+        df = call_with_retry(f"fina_indicator {c}", func="fina_indicator", ts_code=c,
+                             start_date=s_dt, end_date=e_dt,
+                             fields=",".join(FINA_COLS))
+        if df is None or len(df) < 100 or depth >= 4:
+            return df
+        mid = pd.to_datetime(s_dt) + (pd.to_datetime(e_dt) - pd.to_datetime(s_dt)) / 2
+        left = fetch_window(c, s_dt, mid.strftime("%Y%m%d"), depth + 1)
+        right = fetch_window(c, (mid + pd.Timedelta(days=1)).strftime("%Y%m%d"),
+                             e_dt, depth + 1)
+        parts = [d for d in (left, right) if d is not None and not d.empty]
+        return pd.concat(parts, ignore_index=True) if parts else None
+
+    done = 0
+    for i, c in enumerate(codes, 1):
+        df = fetch_window(c, start_s, end_s)
+        if df is not None and not df.empty:
+            df = df[FINA_COLS].copy()
+            for col in ("ann_date", "end_date"):
+                df[col] = pd.to_datetime(df[col], format="%Y%m%d", errors="coerce").dt.date
+            df = df.dropna(subset=["end_date"])
+            df = df[df["end_date"] >= start]
+            df = df.drop_duplicates(subset=["ts_code", "end_date", "update_flag"])
+            if not df.empty:
+                _delete_insert("fina_indicator", df, "ts_code = :c", {"c": c})
+                done += 1
+        if i % 250 == 0 or i == len(codes):
+            print(f"  进度 {i}/{len(codes)}（已入库 {done} 只）"
+                  f"已用 {(time.time()-t0)/60:.1f}min")
+    print(f"[OK] 财务指标完成 {done} 只，用时 {(time.time()-t0)/60:.1f} 分钟")
+
+
 def recompute_sentiment(start=None):
     """从底层数据表聚合重算 market_sentiment（start 仅限定落库范围）。"""
     print("[sentiment] 聚合市场情绪 ...")
@@ -632,6 +691,9 @@ def main():
     p_sent.add_argument("--start", default=None, help="仅重算该日期起（YYYYMMDD）")
     p_pv = with_common(sub.add_parser("pvrank", help="重建量价综合分排名表"))
     p_pv.add_argument("--full", action="store_true", help="全量重建（默认增量）")
+    p_fina = with_common(sub.add_parser("fina", help="同步财务指标（季频，按报告期）"))
+    p_fina.add_argument("--start", default="20160331",
+                        help="起始报告期 YYYYMMDD（季度末，默认 2016Q1）")
 
     args = parser.parse_args()
 
@@ -648,6 +710,8 @@ def main():
         recompute_sentiment(s)
     elif args.cmd == "pvrank":
         recompute_pv_rank(full=args.full)
+    elif args.cmd == "fina":
+        sync_fina(args.start)
     else:
         {"cal": sync_cal, "basic": sync_basic,
          "index": lambda: sync_index(full=args.full),

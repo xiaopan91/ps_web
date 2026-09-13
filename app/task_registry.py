@@ -36,6 +36,16 @@ TASKS = [
         "duration": "约1-3分钟", "long": False,
     },
     {
+        "id": "fina", "name": "同步财务指标",
+        "desc": "季频财务指标（ROE/毛利率/净利率/负债率/营收净利同比），逐只全历史拉取（积分档限制），每季报披露季手动跑一次",
+        "script": "sync_data.py", "args": ["fina"],
+        "params": [
+            {"key": "start", "label": "起始报告期(YYYYMMDD季度末，留空 2016Q1 起)",
+             "type": "text", "required": False, "flag": "--start"},
+        ],
+        "duration": "约2-5分钟", "long": False,
+    },
+    {
         "id": "basic", "name": "同步股票基本信息",
         "desc": "在市股票清单（名称/行业），整表刷新",
         "script": "sync_data.py", "args": ["basic"],

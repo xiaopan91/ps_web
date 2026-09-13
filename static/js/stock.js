@@ -81,24 +81,36 @@ const app = createApp({
     const anaLoading = ref(false);
     const anaError = ref("");
     const anaLoaded = ref(false);
-    const metrics = ref(null);  // /api/stock/metrics
-    const factor = ref(null);   // /api/pvfactor/stock
-    const anaCharts = {};       // id -> echarts 实例
+    const metrics = ref(null);   // /api/stock/metrics
+    const factor = ref(null);    // /api/pvfactor/stock
+    const industry = ref(null);  // /api/pvfactor/industry
+    const funda = ref(null);     // /api/stock/funda
+    const anaCharts = {};        // id -> echarts 实例
+
+    async function fetchJson(url, { optional = false } = {}) {
+      const res = await fetch(url);
+      if (!res.ok) {
+        if (optional) return null;
+        const msg = await res.json().catch(() => ({}));
+        throw new Error(msg.detail || `HTTP ${res.status}`);
+      }
+      return res.json();
+    }
 
     async function loadAnalysis() {
       anaLoading.value = true;
       anaError.value = "";
       try {
-        const [mRes, fRes] = await Promise.all([
-          fetch(`/api/stock/metrics?code=${code.value}&range=${range.value}`),
-          fetch(`/api/pvfactor/stock?code=${code.value}&days=500`),
+        const [m, f, ind, fd] = await Promise.all([
+          fetchJson(`/api/stock/metrics?code=${code.value}&range=${range.value}`),
+          fetchJson(`/api/pvfactor/stock?code=${code.value}&days=500`, { optional: true }),
+          fetchJson(`/api/pvfactor/industry?code=${code.value}`, { optional: true }),
+          fetchJson(`/api/stock/funda?code=${code.value}&range=${range.value}`, { optional: true }),
         ]);
-        if (!mRes.ok) {
-          const msg = await mRes.json().catch(() => ({}));
-          throw new Error(msg.detail || `HTTP ${mRes.status}`);
-        }
-        metrics.value = await mRes.json();
-        factor.value = fRes.ok ? await fRes.json() : null;
+        metrics.value = m;
+        factor.value = f;
+        industry.value = ind;
+        funda.value = fd;
         anaLoaded.value = true;
         render(barsCache);          // 主图叠加相对强弱
         await nextTick();
@@ -120,11 +132,16 @@ const app = createApp({
     const statCards = computed(() => {
       const s = stats.value;
       const f = factor.value?.summary;
+      const ind = industry.value && industry.value.industry ? industry.value : null;
       if (!s) return [];
       const fmt = (v, d = 2, suf = "") => (v == null ? "—" : v.toFixed(d) + suf);
       return [
         { label: "量价综合分", value: f ? f.score.toFixed(3) : "—",
           sub: f ? `第 ${f.rank} / ${f.total} · 进前10% ${f.top10_pct}% 天` : "因子表重建中" },
+        { label: "行业内因子排名", value: ind ? `第 ${ind.rank} / ${ind.industry_total}` : "—",
+          sub: ind ? `行业分位 ${ind.percentile}% · 行业均分 ${ind.industry_mean.toFixed(3)}` : "" },
+        { label: "所在行业", value: ind ? ind.industry : "—",
+          sub: ind ? `全市场共 ${ind.market_total} 只参与排名` : "" },
         { label: "年初至今", value: fmt(s.ytd, 2, "%"),
           cls: s.ytd == null ? "" : (s.ytd >= 0 ? "up" : "down"),
           sub: s.ann_vol != null ? `年化波动 ${s.ann_vol}%` : "" },
@@ -137,6 +154,22 @@ const app = createApp({
         { label: "流通市值", value: fmt(s.circ_mv, 1, "亿"),
           sub: s.total_mv != null ? `总市值 ${s.total_mv} 亿` : "" },
         { label: "ATR20", value: fmt(s.atr20, 2, "%"), sub: "格距/止损参考" },
+      ];
+    });
+
+    // 基本面指标块（最新报告期）
+    const fundaTiles = computed(() => {
+      const l = funda.value?.latest;
+      if (!l) return [];
+      const pct = (v, d = 1) => (v == null ? "—" : v.toFixed(d) + "%");
+      const yoyCls = v => (v == null ? "" : (v >= 0 ? "up" : "down"));
+      return [
+        { label: "ROE", value: pct(l.roe), cls: yoyCls(l.roe) },
+        { label: "毛利率", value: pct(l.grossprofit_margin) },
+        { label: "净利率", value: pct(l.netprofit_margin) },
+        { label: "资产负债率", value: pct(l.debt_to_assets) },
+        { label: "营收同比", value: pct(l.or_yoy), cls: yoyCls(l.or_yoy) },
+        { label: "净利同比", value: pct(l.netprofit_yoy), cls: yoyCls(l.netprofit_yoy) },
       ];
     });
 
@@ -227,25 +260,64 @@ const app = createApp({
         ],
       }, true);
 
-      // 估值：PE × 流通市值
+      // 估值：PE × PB × 流通市值
+      const fd = funda.value;
+      // PB 与 PE 的日期轴来自两个接口（预热裁剪不同，长度可能差一两天），按日期对齐
+      const pbMap = fd && Array.isArray(fd.pb)
+        ? new Map(fd.pb_dates.map((d, i) => [d, fd.pb[i]])) : null;
+      const pbData = pbMap ? m.dates.map(dt => pbMap.get(dt) ?? null) : null;
+      const pbOk = !!(pbData && pbData.some(v => v != null));
       anaChart("chart-val").setOption({
         animation: false,
         tooltip: { trigger: "axis" },
         legend: { top: 0, textStyle: { fontSize: 11 }, itemWidth: 14,
-                  data: ["PE(TTM)", "流通市值(亿)"] },
+                  data: ["PE(TTM)", ...(pbOk ? ["PB"] : []), "流通市值(亿)"] },
         grid: { left: 50, right: 55, top: 26, bottom: 45 },
         xAxis: tsAxis(d),
         yAxis: [
-          { splitNumber: 3 },
+          { splitNumber: 3, name: "倍", nameTextStyle: { fontSize: 10 } },
           { splitNumber: 3, splitLine: { show: false } },
         ],
         dataZoom: [{ type: "inside" }],
         series: [
           { name: "PE(TTM)", type: "line", data: m.pe, showSymbol: false, connectNulls: false,
             lineStyle: { width: 1.2, color: "#a855f7" }, itemStyle: { color: "#a855f7" } },
+          ...(pbOk ? [{
+            name: "PB", type: "line", data: pbData, showSymbol: false, connectNulls: false,
+            lineStyle: { width: 1.2, color: "#0ea5e9" }, itemStyle: { color: "#0ea5e9" },
+          }] : []),
           { name: "流通市值(亿)", type: "line", data: m.circ_mv, yAxisIndex: 1,
             showSymbol: false, lineStyle: { width: 1.2, color: "#f59e0b" },
             itemStyle: { color: "#f59e0b" } },
+        ],
+      }, true);
+
+      // 基本面：近 12 期营收/净利同比（季频柱状）
+      const periods = (fd && fd.periods) || [];
+      const qLabel = s => {
+        if (!s) return "";
+        const [y, mm] = s.split("-");
+        return `${y.slice(2)}Q${Math.floor((+mm - 1) / 3) + 1}`;
+      };
+      const noFunda = !periods.length;
+      anaChart("chart-funda").setOption({
+        animation: false,
+        tooltip: { trigger: "axis" },
+        legend: { top: 0, textStyle: { fontSize: 11 }, itemWidth: 14,
+                  data: ["营收同比%", "净利同比%"] },
+        grid: { left: 45, right: 15, top: 26, bottom: 30 },
+        xAxis: { type: "category",
+                 data: noFunda ? [] : periods.map(p => qLabel(p.end_date)) },
+        yAxis: { splitNumber: 3 },
+        title: noFunda ? {
+          text: "暂无财务数据（fina_indicator 未同步）", left: "center", top: "middle",
+          textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" },
+        } : undefined,
+        series: noFunda ? [] : [
+          { name: "营收同比%", type: "bar", data: periods.map(p => p.or_yoy),
+            itemStyle: { color: "#f59e0b" }, barMaxWidth: 14 },
+          { name: "净利同比%", type: "bar", data: periods.map(p => p.netprofit_yoy),
+            itemStyle: { color: "#3b82f6" }, barMaxWidth: 14 },
         ],
       }, true);
     }
@@ -383,7 +455,8 @@ const app = createApp({
 
     return { query, suggests, code, range, adjust, info, latest, loading, error,
              ranges, adjusts, onInput, pick,
-             anaOpen, anaLoading, anaError, stats, statCards, factor };
+             anaOpen, anaLoading, anaError, stats, statCards, factor, funda,
+             fundaTiles };
   },
 });
 

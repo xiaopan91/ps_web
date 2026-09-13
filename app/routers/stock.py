@@ -264,3 +264,76 @@ def metrics(
         "pos60": _series(df["pos60"], 1),
         "stats": stats,
     }
+
+
+@router.get("/funda")
+def funda(code: str, range: str = "1y", db: Session = Depends(get_db)):
+    """基本面：季频财务指标 + PB 日频历史。
+
+    PB = 未复权收盘价 / bps，bps 按公告日向后对齐（merge_asof backward），
+    公告日之前用上一报告期，严格防前视。
+    """
+    if range not in RANGE_DAYS and range != "all":
+        raise HTTPException(400, f"range 取值: {list(RANGE_DAYS) + ['all']}")
+
+    fina = pd.read_sql(text(
+        "SELECT end_date, ann_date, eps, bps, roe, grossprofit_margin, "
+        "       netprofit_margin, debt_to_assets, or_yoy, netprofit_yoy "
+        "FROM fina_indicator WHERE ts_code = :c "
+        "AND ann_date IS NOT NULL ORDER BY end_date, ann_date"),
+        engine, params={"c": code})
+    if fina.empty:
+        return {"periods": [], "latest": None, "pb_dates": [], "pb": [],
+                "note": "暂无财务数据（fina_indicator 未同步或该股无披露）"}
+    num_cols = ("eps", "bps", "roe", "grossprofit_margin", "netprofit_margin",
+                "debt_to_assets", "or_yoy", "netprofit_yoy")
+    for c in num_cols:
+        fina[c] = pd.to_numeric(fina[c], errors="coerce")
+    for c in ("end_date", "ann_date"):
+        fina[c] = pd.to_datetime(fina[c]).dt.date
+    # 每期取最早公告日版本（防前视；update_flag 不能当版本选择器）
+    fina = fina.drop_duplicates(subset=["end_date"], keep="first")
+
+    def rnd(v, d=2):
+        return None if pd.isna(v) else round(float(v), d)
+
+    last = fina.iloc[-1]
+    latest = {
+        "end_date": str(last["end_date"]), "ann_date": str(last["ann_date"]),
+        "eps": rnd(last["eps"]), "bps": rnd(last["bps"]),
+        "roe": rnd(last["roe"]), "grossprofit_margin": rnd(last["grossprofit_margin"]),
+        "netprofit_margin": rnd(last["netprofit_margin"]),
+        "debt_to_assets": rnd(last["debt_to_assets"]),
+        "or_yoy": rnd(last["or_yoy"], 1), "netprofit_yoy": rnd(last["netprofit_yoy"], 1),
+    }
+    periods = [
+        {"end_date": str(r.end_date), "ann_date": str(r.ann_date),
+         "or_yoy": rnd(r.or_yoy, 1), "netprofit_yoy": rnd(r.netprofit_yoy, 1),
+         "roe": rnd(r.roe)}
+        for r in fina.tail(12).itertuples()]
+
+    # PB 日频：窗口内未复权收盘 ÷ 最近已公告 bps
+    start = (date(1990, 1, 1) if range == "all"
+             else date.today() - timedelta(days=RANGE_DAYS[range]))
+    bars = pd.read_sql(text(
+        "SELECT trade_date, close FROM daily_bar "
+        "WHERE ts_code = :c AND trade_date >= :s ORDER BY trade_date"),
+        engine, params={"c": code, "s": start})
+    bars["close"] = pd.to_numeric(bars["close"], errors="coerce")
+    bps_pts = fina[["ann_date", "bps"]].dropna(subset=["bps"])
+    bps_pts = bps_pts[bps_pts["bps"] > 0].sort_values("ann_date")
+    pb_dates: list = []
+    pb: list = []
+    if not bars.empty and not bps_pts.empty:
+        left = bars.rename(columns={"trade_date": "key"}).assign(
+            key=pd.to_datetime(bars["trade_date"]))
+        right = bps_pts.rename(columns={"ann_date": "key"}).assign(
+            key=pd.to_datetime(bps_pts["ann_date"]))
+        merged = pd.merge_asof(left[["key", "close"]], right[["key", "bps"]],
+                               on="key", direction="backward")
+        pb_s = merged["close"] / merged["bps"].replace(0, np.nan)
+        pb_dates = pd.to_datetime(merged["key"]).dt.strftime("%Y-%m-%d").tolist()
+        pb = _series(pb_s)
+
+    return {"periods": periods, "latest": latest,
+            "pb_dates": pb_dates, "pb": pb}

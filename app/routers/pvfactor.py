@@ -308,3 +308,51 @@ def stock_factor(code: str, days: int = Query(500, ge=50, le=2500)):
         "scores": [round(float(v), 4) for v in df["score"]],
         "summary": summary,
     }
+
+
+@router.get("/industry")
+def industry_rank(code: str):
+    """当日截面：该股量价综合分在所属行业内的排名与行业概览。"""
+    with engine.connect() as conn:
+        latest = conn.execute(text("SELECT MAX(trade_date) FROM pv_rank")).scalar()
+    if latest is None:
+        return {"date": None, "note": "pv_rank 无数据（可能重建中）"}
+
+    df = pd.read_sql(text(
+        "SELECT r.ts_code, r.score, b.name, b.industry "
+        "FROM pv_rank r LEFT JOIN stock_basic b ON b.ts_code = r.ts_code "
+        "WHERE r.trade_date = :d"),
+        engine, params={"d": latest})
+    df["score"] = pd.to_numeric(df["score"], errors="coerce")
+    df = df.dropna(subset=["score"])
+    row = df[df["ts_code"] == code]
+    if row.empty:
+        raise HTTPException(404, f"{code} 在 {latest} 无因子数据")
+    industry = row["industry"].iloc[0]
+    stock_score = float(row["score"].iloc[0])
+    if pd.isna(industry) or not str(industry).strip():
+        return {"date": str(latest), "industry": None,
+                "note": "该股无行业分类（stock_basic.industry 为空）"}
+
+    peers = df[df["industry"] == industry].sort_values("score", ascending=False) \
+        .reset_index(drop=True)
+    rank = int(peers.index[peers["ts_code"] == code][0]) + 1
+    # 行业热度：行业均分在全部行业中的名次（行业间对比）
+    ind_means = df.groupby("industry")["score"].mean().sort_values(ascending=False)
+    heat_rank = int(ind_means.index.get_loc(industry)) + 1
+    return {
+        "date": str(latest),
+        "industry": str(industry),
+        "industry_total": len(peers),
+        "rank": rank,
+        "percentile": round((1 - (rank - 1) / len(peers)) * 100, 1),
+        "stock_score": round(stock_score, 4),
+        "industry_mean": round(float(peers["score"].mean()), 4),
+        "industry_heat": {"rank": heat_rank, "of": int(ind_means.notna().sum())},
+        "market_total": len(df),
+        "top_peers": [
+            {"ts_code": r.ts_code,
+             "name": r.name if isinstance(r.name, str) else r.ts_code,
+             "score": round(float(r.score), 4), "rank": i + 1}
+            for i, r in enumerate(peers.head(5).itertuples())],
+    }

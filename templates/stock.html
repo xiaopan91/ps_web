@@ -149,9 +149,28 @@
           <div class="col-12 col-lg-6">
             <div class="card ana-card h-100"><div class="card-body">
               <h6 class="card-title">估值
-                <span class="text-muted small fw-normal">PE(TTM) × 流通市值（亿元）</span>
+                <span class="text-muted small fw-normal">PE / PB × 流通市值（亿元）</span>
               </h6>
               <div id="chart-val" class="ana-chart"></div>
+            </div></div>
+          </div>
+          <div class="col-12">
+            <div class="card ana-card h-100"><div class="card-body">
+              <h6 class="card-title">基本面
+                <span class="text-muted small fw-normal" v-if="funda && funda.latest">
+                  {{ funda.latest.end_date.slice(0, 7) }} 报告期 · 公布于 {{ funda.latest.ann_date }}
+                </span>
+                <span class="text-muted small fw-normal" v-else>暂无财务数据</span>
+              </h6>
+              <div class="row g-1 my-2">
+                <div class="col-4 col-md-2" v-for="t in fundaTiles" :key="t.label">
+                  <div class="border rounded p-1 text-center">
+                    <div class="text-muted" style="font-size:.7rem">{{ t.label }}</div>
+                    <div class="fw-semibold" :class="t.cls" style="font-size:.9rem">{{ t.value }}</div>
+                  </div>
+                </div>
+              </div>
+              <div id="chart-funda" class="ana-chart"></div>
             </div></div>
           </div>
         </div>
@@ -162,6 +181,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/stock.js?v=20260913"></script>
+  <script src="/static/js/stock.js?v=20260913-3"></script>
 </body>
 </html>

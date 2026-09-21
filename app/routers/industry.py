@@ -137,6 +137,46 @@ def overview(type: str = Query(default="sw_l2")):
     return payload
 
 
+@router.get("/members")
+def members(board_code: str):
+    """板块成分股清单（含最新交易日行情快照），按成交额降序。"""
+    g = pd.read_sql(text(
+        "SELECT board_name, board_type FROM board_group WHERE board_code = :c"),
+        engine, params={"c": board_code})
+    if g.empty:
+        raise HTTPException(404, f"未知板块: {board_code}")
+    df = pd.read_sql(text(
+        "SELECT m.ts_code, b.name, b.industry, m.weight, "
+        "       d.close, d.pct_chg, d.amount, b2.turnover_rate_f, b2.circ_mv, b2.pe_ttm "
+        "FROM board_member m "
+        "LEFT JOIN stock_basic b ON b.ts_code = m.ts_code "
+        "LEFT JOIN daily_bar d ON d.ts_code = m.ts_code "
+        "  AND d.trade_date = (SELECT MAX(trade_date) FROM daily_bar) "
+        "LEFT JOIN daily_basic b2 ON b2.ts_code = m.ts_code "
+        "  AND b2.trade_date = (SELECT MAX(trade_date) FROM daily_basic) "
+        "WHERE m.board_code = :c "
+        "ORDER BY d.amount DESC"), engine, params={"c": board_code})
+
+    def num(s, d=2):
+        return [None if pd.isna(v) else round(float(v), d) for v in s]
+
+    members = [{
+        "ts_code": r.ts_code,
+        "name": r.name if isinstance(r.name, str) else r.ts_code,
+        "industry": r.industry if isinstance(r.industry, str) else None,
+        "weight": None if pd.isna(r.weight) else round(float(r.weight), 2),
+        "close": None if pd.isna(r.close) else round(float(r.close), 2),
+        "pct_chg": None if pd.isna(r.pct_chg) else round(float(r.pct_chg), 2),
+        "amount": None if pd.isna(r.amount) else round(float(r.amount) / 1e5, 3),
+        "turnover_f": None if pd.isna(r.turnover_rate_f) else round(float(r.turnover_rate_f), 2),
+        "circ_mv": None if pd.isna(r.circ_mv) else round(float(r.circ_mv) / 1e4, 1),
+        "pe_ttm": None if pd.isna(r.pe_ttm) else round(float(r.pe_ttm), 2),
+    } for r in df.itertuples()]
+    return {"board_code": board_code, "board_name": g["board_name"].iloc[0],
+            "board_type": g["board_type"].iloc[0], "total": len(members),
+            "members": members}
+
+
 @router.get("/detail")
 def detail(board_code: str, days: int = Query(default=250, ge=30, le=3000)):
     """单板块序列：净值（theme=官方指数）vs 全市场等权基准 + RS + 资金序列。"""

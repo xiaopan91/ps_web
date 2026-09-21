@@ -793,7 +793,7 @@ def sync_board():
     for r in mem.itertuples():
         for code in (r.l1_code, r.l2_code, r.l3_code):
             if isinstance(code, str) and code:
-                members.append({"board_code": code, "ts_code": r.ts_code})
+                members.append({"board_code": code, "ts_code": r.ts_code, "weight": None})
     n_sw_mem = len(members)
 
     # 主题指数：最新月末的成分快照
@@ -807,7 +807,8 @@ def sync_board():
             print(f"  [警告] {code} {name} 成分为空，跳过")
             continue
         for r in w.itertuples():
-            members.append({"board_code": code, "ts_code": r.con_code})
+            members.append({"board_code": code, "ts_code": r.con_code,
+                            "weight": float(r.weight) if not pd.isna(r.weight) else None})
 
     groups_df = pd.DataFrame(groups).drop_duplicates(subset=["board_code"])
     members_df = pd.DataFrame(members).drop_duplicates()

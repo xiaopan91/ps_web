@@ -27,6 +27,7 @@ class BoardMember(Base):
 
     board_code = Column(String(16), primary_key=True, comment="板块代码")
     ts_code = Column(String(12), primary_key=True, comment="股票代码")
+    weight = Column(DECIMAL(10, 4), comment="指数内权重（%，主题指数有，申万为空）")
 
 
 class BoardDaily(Base):

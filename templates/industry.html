@@ -69,7 +69,7 @@
           </h6>
           <div class="d-flex flex-wrap gap-2">
             <a v-for="(h, idx) in summary.heat" :key="h.code" href="#"
-               class="fav-chip" @click.prevent="selectIndustry(h.code)">
+               class="fav-chip" @click.prevent="gotoDetail(h.code)">
               <strong>{{ idx + 1 }}. {{ h.industry }}</strong>
               <span :class="h.r1 >= 0 ? 'up' : 'down'">{{ h.r1 >= 0 ? '+' : '' }}{{ h.r1 }}%</span>
               <span class="text-muted">🔥{{ h.streak }}</span>
@@ -86,7 +86,7 @@
           <h6 class="card-title mb-0">行业动量表</h6>
           <input class="form-control form-control-sm" style="max-width:200px"
                  v-model="keyword" placeholder="筛选板块名…">
-          <span class="text-muted small ms-auto">点击行查看趋势详情</span>
+          <span class="text-muted small ms-auto">点击行进入板块详情页</span>
         </div>
         <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
           <table class="table table-sm table-hover mom sticky-head mb-0">
@@ -109,10 +109,10 @@
             </thead>
             <tbody>
               <tr v-for="r in filteredRows" :key="r.industry"
-                  class="row-click" :class="{'row-active': r.industry===sel}"
-                  @click="selectIndustry(r.industry)">
+                  class="row-click"
+                  @click="gotoDetail(r.industry)">
                 <td><strong>{{ r.name || r.industry }}</strong>
-                  <span class="text-muted small" v-if="showCode">{{ r.industry }}</span></td>
+                  <span class="text-muted small" v-if="type!=='sw_l1'">{{ r.industry }}</span></td>
                 <td class="text-end text-muted">{{ r.n_stocks }}</td>
                 <td class="text-end" :class="xcls(r.r1)">{{ fx(r.r1) }}</td>
                 <td class="text-end text-muted">{{ r.rank_today }}</td>
@@ -143,37 +143,12 @@
           [新] = 今日首次上榜（新热点萌芽）；上榜线内排名即「今日名次」。
         </div>
       </div></div>
-
-      <!-- 单板块详情 -->
-      <div v-if="sel">
-        <div class="d-flex align-items-center gap-3 mb-2">
-          <h6 class="mb-0">{{ detailName }} <span class="text-muted small fw-normal">趋势详情</span></h6>
-          <div class="btn-group btn-group-sm" role="group">
-            <button v-for="d in dayOpts" :key="d" class="btn"
-                    :class="days===d ? 'btn-primary':'btn-outline-primary'"
-                    @click="days=d">{{ d }}日</button>
-          </div>
-        </div>
-        <div class="card mb-3"><div class="card-body">
-          <h6 class="card-title small text-muted mb-1">{{ isTheme
-            ? '净值对比（期初=100）：官方指数 / 全市场等权'
-            : '净值对比（期初=100）：等权 / 加权 / 全市场等权' }}</h6>
-          <div id="chart-nav" class="chart"></div>
-        </div></div>
-        <div class="row g-3">
-          <div class="col-12"><div class="card"><div class="card-body">
-            <h6 class="card-title small text-muted mb-1">成交占比 % 与上涨家数占比 %</h6>
-            <div id="chart-share" class="chart-sm"></div>
-          </div></div></div>
-        </div>
-      </div>
-      <div class="text-muted small mb-4" v-else>点击上方表格中的板块查看趋势详情。</div>
     </main>
   </div>
 
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/industry.js?v=20260922-3"></script>
+  <script src="/static/js/industry.js?v=20260922-4"></script>
 </body>
 </html>

@@ -110,6 +110,12 @@ def industry_page():
     return FileResponse(TEMPLATES_DIR / "industry.html")
 
 
+@app.get("/industry/detail", include_in_schema=False)
+def board_detail_page():
+    """板块详情页（趋势 + 成分股）。"""
+    return FileResponse(TEMPLATES_DIR / "board_detail.html")
+
+
 @app.get("/strategy", include_in_schema=False)
 def strategy_page():
     """买卖策略容器页。"""

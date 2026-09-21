@@ -397,6 +397,7 @@ def cmd_update(args):
     sync_index()
     recompute_sentiment()
     recompute_pv_rank()
+    recompute_industry()
 
 
 # ---------------------------------------------------------------- 情绪计算
@@ -661,6 +662,76 @@ def recompute_sentiment(start=None):
     print(f"[OK] 情绪表 {n} 日，用时 {time.time()-t0:.0f}s")
 
 
+# ---------------------------------------------------------------- 行业聚合
+
+def recompute_industry(full=False):
+    """聚合行业日频指标（自建行业指数，按 (industry, trade_date) 先删后插）。"""
+    import app.models  # noqa: F401  注册 ORM 模型，确保 industry_daily 表存在
+    print("[industry] 聚合行业日频指标 ...")
+    t0 = time.time()
+    Base.metadata.create_all(engine)
+
+    with engine.connect() as conn:
+        if not full:
+            have = conn.execute(text(
+                "SELECT MAX(trade_date) FROM industry_daily")).scalar()
+        else:
+            have = None
+    start = have if have else date(2016, 1, 1)
+
+    df = pd.read_sql(text(
+        "SELECT d.trade_date, b.industry, d.pct_chg, d.close, d.pre_close, "
+        "       d.amount, b2.turnover_rate_f, b2.circ_mv "
+        "FROM daily_bar d "
+        "LEFT JOIN stock_basic b ON b.ts_code = d.ts_code "
+        "LEFT JOIN daily_basic b2 ON b2.ts_code = d.ts_code AND b2.trade_date = d.trade_date "
+        "WHERE d.trade_date >= :s AND b.industry IS NOT NULL"),
+        engine, params={"s": start})
+    if df.empty:
+        print("[OK] 无新增数据")
+        return
+    for c in ("pct_chg", "close", "pre_close", "amount", "turnover_rate_f", "circ_mv"):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    # 个股日收益用 close/pre_close 复算（pct_chg 缺失行仍可参与等权均值）
+    df["ret"] = np.where((df["close"] > 0) & (df["pre_close"] > 0),
+                         (df["close"] / df["pre_close"] - 1) * 100, np.nan)
+    df["up"] = (df["ret"] > 0).astype("float64")
+    df.loc[df["ret"].isna(), "up"] = np.nan
+    df["down"] = (df["ret"] < 0).astype("float64")
+    df.loc[df["ret"].isna(), "down"] = np.nan
+    df["circ_mv"] = df["circ_mv"] / 1e4          # 万元 → 亿元
+    df["amount"] = df["amount"] / 1e5            # 千元 → 亿元
+    df["mv_w"] = df["circ_mv"] * df["ret"]       # 市值加权收益的分子
+
+    g = df.groupby(["industry", "trade_date"], sort=False)
+    out = pd.DataFrame({
+        "n_stocks": g["ret"].count(),
+        "up_count": g["up"].sum(),
+        "down_count": g["down"].sum(),
+        "ret_eq": g["ret"].mean(),
+        "ret_cap_num": g["mv_w"].sum(),
+        "cap_w": g["circ_mv"].sum(),
+        "amount": g["amount"].sum(),
+        "turnover_med": g["turnover_rate_f"].median(),
+        "circ_mv": g["circ_mv"].sum(),
+    }).reset_index()
+    # 市值加权收益：ret 已是百分数，Σ(市值×ret%)/Σ(市值) 即加权百分数
+    out["ret_cap"] = np.where(out["cap_w"] > 0,
+                              out["ret_cap_num"] / out["cap_w"], np.nan)
+    day_amount = out.groupby("trade_date")["amount"].transform("sum")
+    out["amount_share"] = np.where(day_amount > 0, out["amount"] / day_amount * 100, np.nan)
+
+    out["trade_date"] = pd.to_datetime(out["trade_date"]).dt.date
+    cols = ["industry", "trade_date", "n_stocks", "up_count", "down_count",
+            "ret_eq", "ret_cap", "amount", "amount_share", "turnover_med", "circ_mv"]
+    out = out[cols]
+    n = _delete_insert("industry_daily", out,
+                       "trade_date >= :s", {"s": out["trade_date"].min()})
+    print(f"[OK] 行业聚合 {out['industry'].nunique()} 个行业 "
+          f"{out['trade_date'].min()} ~ {out['trade_date'].max()}，共 {n:,} 行，"
+          f"用时 {time.time()-t0:.0f}s")
+
+
 def main():
     global SLEEP
     parser = argparse.ArgumentParser(description="tushare A股数据同步")
@@ -694,6 +765,8 @@ def main():
     p_fina = with_common(sub.add_parser("fina", help="同步财务指标（季频，按报告期）"))
     p_fina.add_argument("--start", default="20160331",
                         help="起始报告期 YYYYMMDD（季度末，默认 2016Q1）")
+    p_ind = with_common(sub.add_parser("industry", help="聚合行业日频指标（自建行业指数）"))
+    p_ind.add_argument("--full", action="store_true", help="全量重建（默认增量）")
 
     args = parser.parse_args()
 
@@ -712,6 +785,8 @@ def main():
         recompute_pv_rank(full=args.full)
     elif args.cmd == "fina":
         sync_fina(args.start)
+    elif args.cmd == "industry":
+        recompute_industry(full=args.full)
     else:
         {"cal": sync_cal, "basic": sync_basic,
          "index": lambda: sync_index(full=args.full),

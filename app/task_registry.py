@@ -46,6 +46,17 @@ TASKS = [
         "duration": "约2-5分钟", "long": False,
     },
     {
+        "id": "industry", "name": "重建行业日频指标",
+        "desc": "聚合全市场个股为行业等权/加权收益、成交占比等（行业观察页数据源，增量）",
+        "script": "sync_data.py", "args": ["industry"],
+        "params": [
+            {"key": "full", "label": "全量重建",
+             "type": "select", "choices": ["增量", "全量"],
+             "required": False, "flag_map": {"增量": "", "全量": "--full"}},
+        ],
+        "duration": "增量约10秒/全量1-3分钟", "long": False,
+    },
+    {
         "id": "basic", "name": "同步股票基本信息",
         "desc": "在市股票清单（名称/行业），整表刷新",
         "script": "sync_data.py", "args": ["basic"],

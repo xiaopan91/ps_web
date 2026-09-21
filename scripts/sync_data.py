@@ -44,6 +44,18 @@ FINA_COLS = ["ts_code", "ann_date", "end_date", "update_flag", "eps", "bps",
              "roe", "grossprofit_margin", "netprofit_margin", "debt_to_assets",
              "or_yoy", "netprofit_yoy"]
 
+# 主题指数预置清单（中证/国证，2026-09 逐个验证过日线+成分可得性）
+THEME_INDICES = [
+    ("931743.CSI", "半导体设备"), ("931071.CSI", "半导体"), ("H30184.CSI", "全指半导体"),
+    ("931865.CSI", "芯片产业"), ("931494.CSI", "消费电子"), ("930850.CSI", "云计算"),
+    ("930713.CSI", "人工智能"), ("930790.CSI", "机器人"), ("931151.CSI", "光伏产业"),
+    ("399976.SZ", "新能源车"), ("931642.CSI", "中证新能"), ("931643.CSI", "中证电池"),
+    ("399997.SZ", "白酒"), ("399989.SZ", "医疗"), ("399975.SZ", "证券公司"),
+    ("399986.SZ", "银行"), ("399967.SZ", "军工"), ("930901.CSI", "动漫游戏"),
+    ("399998.SZ", "煤炭"), ("399440.SZ", "钢铁"), ("399395.SZ", "有色"),
+    ("930651.CSI", "中证全指房地产"), ("931009.CSI", "中证全指家电"),
+]
+
 INDICES = [  # 13 只核心/风格指数
     ("000001.SH", "上证指数"), ("399001.SZ", "深证成指"), ("000300.SH", "沪深300"),
     ("000905.SH", "中证500"), ("000852.SH", "中证1000"), ("399303.SZ", "国证2000"),
@@ -398,6 +410,7 @@ def cmd_update(args):
     recompute_sentiment()
     recompute_pv_rank()
     recompute_industry()
+    recompute_board()
 
 
 # ---------------------------------------------------------------- 情绪计算
@@ -732,6 +745,157 @@ def recompute_industry(full=False):
           f"用时 {time.time()-t0:.0f}s")
 
 
+# ---------------------------------------------------------------- 板块体系
+
+def sync_board():
+    """重建板块目录与成分：申万 L1/L2/L3（当前成分）+ 主题指数（最新月末快照）。"""
+    import calendar
+
+    import app.models  # noqa: F401  注册 ORM 模型
+    print("[board] 重建板块目录与成分 ...")
+    t0 = time.time()
+    Base.metadata.create_all(engine)
+    today = date.today()
+
+    groups, members = [], []
+    # 申万分类 + 成分（is_new=Y 当前成分）
+    cls = call_with_retry("index_classify SW2021", func="index_classify", src="SW2021")
+    for r in cls.itertuples():
+        if r.level in ("L1", "L2", "L3") and str(r.is_pub) == "1":
+            groups.append({"board_code": r.index_code,
+                           "board_type": f"sw_{r.level.lower()}",
+                           "board_name": r.industry_name})
+    mem = call_with_retry("index_member_all", func="index_member_all")
+    mem = mem[mem["is_new"] == "Y"]
+    for r in mem.itertuples():
+        for code in (r.l1_code, r.l2_code, r.l3_code):
+            if isinstance(code, str) and code:
+                members.append({"board_code": code, "ts_code": r.ts_code})
+    n_sw_mem = len(members)
+
+    # 主题指数：最新月末的成分快照
+    eom = date(today.year, today.month, 1) - timedelta(days=1)
+    eom = date(eom.year, eom.month, calendar.monthrange(eom.year, eom.month)[1])
+    for code, name in THEME_INDICES:
+        groups.append({"board_code": code, "board_type": "theme", "board_name": name})
+        w = call_with_retry(f"index_weight {code}", func="index_weight",
+                            index_code=code, trade_date=f"{eom:%Y%m%d}")
+        if w is None or w.empty:
+            print(f"  [警告] {code} {name} 成分为空，跳过")
+            continue
+        for r in w.itertuples():
+            members.append({"board_code": code, "ts_code": r.con_code})
+
+    groups_df = pd.DataFrame(groups).drop_duplicates(subset=["board_code"])
+    members_df = pd.DataFrame(members).drop_duplicates()
+    members_df = members_df[members_df["board_code"].isin(set(groups_df["board_code"]))]
+    n1 = _delete_insert("board_group", groups_df, "1=1", {})
+    n2 = _delete_insert("board_member", members_df, "1=1", {})
+    print(f"[OK] 板块目录 {n1} 个（申万 {n1 - len(THEME_INDICES)} + 主题 {len(THEME_INDICES)}），"
+          f"成分 {n2:,} 条（申万 {n_sw_mem:,}），用时 {time.time()-t0:.0f}s")
+
+
+def sync_index_ext():
+    """同步主题指数官方日线进 index_daily 表（增量）。"""
+    print("[index_ext] 同步主题指数日线 ...")
+    t0 = time.time()
+    for code, name in THEME_INDICES:
+        with engine.connect() as conn:
+            last = conn.execute(text(
+                "SELECT MAX(trade_date) FROM index_daily WHERE ts_code = :c"),
+                {"c": code}).scalar()
+        start = (last + timedelta(days=1)).strftime("%Y%m%d") if last else "20150101"
+        df = call_with_retry(f"index_daily {code}", func="index_daily", ts_code=code,
+                             start_date=start, end_date=f"{date.today():%Y%m%d}")
+        if df is None or df.empty:
+            print(f"  {code} {name}: 无新增")
+            continue
+        df = df[["ts_code", "trade_date", "open", "high", "low", "close",
+                 "pct_chg", "vol", "amount"]].copy()
+        df["trade_date"] = df["trade_date"].map(to_date)
+        n = _delete_insert("index_daily", df, "ts_code = :c AND trade_date >= :s",
+                           {"c": code, "s": df["trade_date"].min()})
+        print(f"  {code} {name}: +{n} 行（{df['trade_date'].min()} 起）")
+    print(f"[OK] 主题指数日线完成，用时 {time.time()-t0:.0f}s")
+
+
+def recompute_board(full=False):
+    """聚合板块日频指标：申万自建聚合；theme 的 ret 字段回填官方指数涨跌幅。"""
+    import app.models  # noqa: F401  注册 ORM 模型
+    print("[board_daily] 聚合板块日频指标 ...")
+    t0 = time.time()
+    Base.metadata.create_all(engine)
+
+    with engine.connect() as conn:
+        have = None if full else conn.execute(
+            text("SELECT MAX(trade_date) FROM board_daily")).scalar()
+    start = have if have else date(2016, 1, 1)
+
+    mem = pd.read_sql(text("SELECT board_code, ts_code FROM board_member"), engine)
+    if mem.empty:
+        print("[警告] board_member 为空，请先运行 sync_data.py board")
+        return
+    df = pd.read_sql(text(
+        "SELECT d.trade_date, d.ts_code, d.close, d.pre_close, d.amount, "
+        "       b2.turnover_rate_f, b2.circ_mv "
+        "FROM daily_bar d "
+        "LEFT JOIN daily_basic b2 ON b2.ts_code = d.ts_code AND b2.trade_date = d.trade_date "
+        "WHERE d.trade_date >= :s"), engine, params={"s": start})
+    df = df.merge(mem, on="ts_code", how="inner")  # 一股属多板块（L1+L2+L3+主题）→ 行数膨胀
+    for c in ("close", "pre_close", "amount", "turnover_rate_f", "circ_mv"):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    df["ret"] = np.where((df["close"] > 0) & (df["pre_close"] > 0),
+                         (df["close"] / df["pre_close"] - 1) * 100, np.nan)
+    df["up"] = (df["ret"] > 0).astype("float64")
+    df.loc[df["ret"].isna(), "up"] = np.nan
+    df["down"] = (df["ret"] < 0).astype("float64")
+    df.loc[df["ret"].isna(), "down"] = np.nan
+    df["circ_mv"] = df["circ_mv"] / 1e4
+    df["amount"] = df["amount"] / 1e5
+    df["mv_w"] = df["circ_mv"] * df["ret"]
+
+    g = df.groupby(["board_code", "trade_date"], sort=False)
+    out = pd.DataFrame({
+        "n_stocks": g["ret"].count(),
+        "up_count": g["up"].sum(),
+        "down_count": g["down"].sum(),
+        "ret_eq": g["ret"].mean(),
+        "ret_cap_num": g["mv_w"].sum(),
+        "cap_w": g["circ_mv"].sum(),
+        "amount": g["amount"].sum(),
+        "turnover_med": g["turnover_rate_f"].median(),
+        "circ_mv": g["circ_mv"].sum(),
+    }).reset_index()
+    out["ret_cap"] = np.where(out["cap_w"] > 0,
+                              out["ret_cap_num"] / out["cap_w"], np.nan)
+    day_amount = out.groupby("trade_date")["amount"].transform("sum")
+    out["amount_share"] = np.where(day_amount > 0, out["amount"] / day_amount * 100, np.nan)
+
+    # theme 板块的 ret 字段回填官方指数涨跌幅（权威口径）
+    theme_ret = pd.read_sql(
+        text("SELECT ts_code AS board_code, trade_date, pct_chg FROM index_daily "
+             "WHERE ts_code IN :cs").bindparams(bindparam("cs", expanding=True)),
+        engine, params={"cs": [c for c, _ in THEME_INDICES]})
+    if not theme_ret.empty:
+        theme_ret["pct_chg"] = pd.to_numeric(theme_ret["pct_chg"], errors="coerce")
+        theme_ret["trade_date"] = pd.to_datetime(theme_ret["trade_date"]).dt.date
+        out = out.merge(theme_ret, on=["board_code", "trade_date"], how="left")
+        m = out["pct_chg"].notna()
+        out.loc[m, "ret_eq"] = out.loc[m, "pct_chg"]
+        out.loc[m, "ret_cap"] = out.loc[m, "pct_chg"]
+        out = out.drop(columns=["pct_chg"])
+
+    out["trade_date"] = pd.to_datetime(out["trade_date"]).dt.date
+    cols = ["board_code", "trade_date", "n_stocks", "up_count", "down_count",
+            "ret_eq", "ret_cap", "amount", "amount_share", "turnover_med", "circ_mv"]
+    out = out[cols]
+    n = _delete_insert("board_daily", out, "trade_date >= :s",
+                       {"s": out["trade_date"].min()})
+    print(f"[OK] 板块聚合 {out['board_code'].nunique()} 个板块 "
+          f"{out['trade_date'].min()} ~ {out['trade_date'].max()}，共 {n:,} 行，"
+          f"用时 {time.time()-t0:.0f}s")
+
+
 def main():
     global SLEEP
     parser = argparse.ArgumentParser(description="tushare A股数据同步")
@@ -767,6 +931,8 @@ def main():
                         help="起始报告期 YYYYMMDD（季度末，默认 2016Q1）")
     p_ind = with_common(sub.add_parser("industry", help="聚合行业日频指标（自建行业指数）"))
     p_ind.add_argument("--full", action="store_true", help="全量重建（默认增量）")
+    with_common(sub.add_parser("board", help="重建板块目录与成分（申万层级 + 主题指数）"))
+    with_common(sub.add_parser("index_ext", help="同步主题指数官方日线（增量）"))
 
     args = parser.parse_args()
 
@@ -787,6 +953,10 @@ def main():
         sync_fina(args.start)
     elif args.cmd == "industry":
         recompute_industry(full=args.full)
+    elif args.cmd == "board":
+        sync_board()
+    elif args.cmd == "index_ext":
+        sync_index_ext()
     else:
         {"cal": sync_cal, "basic": sync_basic,
          "index": lambda: sync_index(full=args.full),

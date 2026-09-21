@@ -57,6 +57,18 @@ TASKS = [
         "duration": "增量约10秒/全量1-3分钟", "long": False,
     },
     {
+        "id": "board", "name": "重建板块目录与成分",
+        "desc": "申万 L1/L2/L3 分类成分 + 主题指数最新月末成分（板块观察页数据源）",
+        "script": "sync_data.py", "args": ["board"],
+        "params": [], "duration": "约1分钟", "long": False,
+    },
+    {
+        "id": "index_ext", "name": "同步主题指数日线",
+        "desc": "23 个预置主题指数（半导体设备/白酒/军工等）的官方日线，增量",
+        "script": "sync_data.py", "args": ["index_ext"],
+        "params": [], "duration": "约1-2分钟", "long": False,
+    },
+    {
         "id": "basic", "name": "同步股票基本信息",
         "desc": "在市股票清单（名称/行业），整表刷新",
         "script": "sync_data.py", "args": ["basic"],

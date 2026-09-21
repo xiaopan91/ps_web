@@ -61,6 +61,25 @@
       </div>
       <div class="text-muted small" v-if="loading">加载中…</div>
 
+      <!-- 今日热度榜 -->
+      <div class="card mb-3" v-if="summary && summary.heat && summary.heat.length">
+        <div class="card-body py-2">
+          <h6 class="card-title small text-muted mb-2">
+            今日热度榜（涨幅前 {{ summary.hot_n }} 上榜 · 🔥 = 连续在榜天数 · [新] = 今日新上榜）
+          </h6>
+          <div class="d-flex flex-wrap gap-2">
+            <a v-for="(h, idx) in summary.heat" :key="h.code" href="#"
+               class="fav-chip" @click.prevent="selectIndustry(h.code)">
+              <strong>{{ idx + 1 }}. {{ h.industry }}</strong>
+              <span :class="h.r1 >= 0 ? 'up' : 'down'">{{ h.r1 >= 0 ? '+' : '' }}{{ h.r1 }}%</span>
+              <span class="text-muted">🔥{{ h.streak }}</span>
+              <span class="text-muted small">5日{{ h.hits5 }}/{{ summary.hot_n > 5 ? 5 : summary.hot_n }}</span>
+              <span class="badge text-bg-warning best-badge" v-if="h.streak === 1">新</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
       <!-- 行业动量表 -->
       <div class="card mb-3"><div class="card-body">
         <div class="d-flex align-items-center gap-3 mb-2">
@@ -76,6 +95,8 @@
                 <th @click="sortBy('name')">板块</th>
                 <th class="text-end" @click="sortBy('n_stocks')">家数</th>
                 <th class="text-end" @click="sortBy('r1')">今日</th>
+                <th class="text-end" @click="sortBy('rank_today')">今日名次</th>
+                <th class="text-end" @click="sortBy('streak')">连续在榜</th>
                 <th class="text-end" @click="sortBy('r5')">5日</th>
                 <th class="text-end" @click="sortBy('r20')">20日</th>
                 <th class="text-end" @click="sortBy('r60')">60日</th>
@@ -94,6 +115,12 @@
                   <span class="text-muted small" v-if="showCode">{{ r.industry }}</span></td>
                 <td class="text-end text-muted">{{ r.n_stocks }}</td>
                 <td class="text-end" :class="xcls(r.r1)">{{ fx(r.r1) }}</td>
+                <td class="text-end text-muted">{{ r.rank_today }}</td>
+                <td class="text-end">
+                  <span v-if="r.streak > 0" :class="r.streak >= 3 ? 'up' : ''">🔥{{ r.streak }}</span>
+                  <span class="badge text-bg-warning best-badge" v-else-if="r.rank_today <= (summary?.hot_n || 10)">新</span>
+                  <span class="text-muted" v-else>—</span>
+                </td>
                 <td class="text-end" :class="xcls(r.r5)">{{ fx(r.r5) }}</td>
                 <td class="text-end" :class="xcls(r.r20)">{{ fx(r.r20) }}</td>
                 <td class="text-end" :class="xcls(r.r60)">{{ fx(r.r60) }}</td>
@@ -111,6 +138,9 @@
           自建聚合；主题指数（23 个中证/国证预置清单）的涨幅直接取官方指数日线，成分=最新月末快照
           （历史成分变动未回溯，属近似）；涨幅按净值折算，全市场等权基准由申万二级家数加权合成。
           成交占比为板块成交额占全市场比，变化为 20 日差（pp）。
+          热度口径：按当日等权涨幅在同类板块中排名，进入前 {{ summary?.hot_n || 10 }} 记为上榜
+          （板块数少的类型自适应下调上榜线）；🔥n = 连续 n 天在榜（热度持续性），
+          [新] = 今日首次上榜（新热点萌芽）；上榜线内排名即「今日名次」。
         </div>
       </div></div>
 
@@ -144,6 +174,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/industry.js?v=20260922-2"></script>
+  <script src="/static/js/industry.js?v=20260922-3"></script>
 </body>
 </html>

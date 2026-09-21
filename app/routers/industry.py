@@ -93,6 +93,23 @@ def overview(type: str = Query(default="sw_l2")):
     }).sort_values("r20", ascending=False)
     rows["momentum_rank"] = range(1, len(rows) + 1)
 
+    # 热度：每日等权涨幅排名，进入前 N 记为上榜（板块少的类型自适应下调上榜线）
+    n_boards = len(cum.columns)
+    hot_n = min(10, max(5, round(n_boards * 0.08)))
+    rank_df = piv.rank(ascending=False, axis=1)
+    hv = (rank_df <= hot_n).values
+    streak_arr = np.zeros_like(hv, dtype=int)
+    prev = np.zeros(hv.shape[1], dtype=int)
+    for i in range(hv.shape[0]):
+        prev = (prev + 1) * hv[i]
+        streak_arr[i] = prev
+    rank_today = rank_df.iloc[-1]
+    streak_today = pd.Series(streak_arr[-1], index=rank_df.columns)
+    hits5 = (rank_df <= hot_n).tail(5).sum()
+    rows["rank_today"] = rank_today.reindex(cum.columns).fillna(hot_n + 1).astype(int).values
+    rows["streak"] = streak_today.values
+    rows["hits5"] = hits5.reindex(cum.columns).fillna(0).astype(int).values
+
     def tops(s: pd.Series, k=3, asc=False):
         s = s.dropna().sort_values(ascending=asc).head(k)
         return [{"industry": str(names.get(i, i)), "v": round(float(v), 2)}
@@ -104,6 +121,14 @@ def overview(type: str = Query(default="sw_l2")):
         "strong20": tops(r20), "weak20": tops(r20, asc=True),
         "flow_in": tops(share_chg), "flow_out": tops(share_chg, asc=True),
         "beat_market": int((r20 > mkt_r20).sum()), "total": int(len(rows)),
+        "hot_n": hot_n,
+        "heat": [
+            {"code": str(code), "industry": str(names.get(code, code)),
+             "r1": round(float(piv.iloc[-1][code]), 2),
+             "streak": int(streak_today.get(code, 0)),
+             "hits5": int(hits5.get(code, 0))}
+            for code in rank_df.iloc[-1].dropna().sort_values().index[:hot_n]
+        ],
     }
     payload = {"latest_date": summary["latest_date"], "type": type,
                "summary": summary,

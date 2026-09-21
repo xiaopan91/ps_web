@@ -122,6 +122,32 @@ const app = createApp({
             lineStyle: { width: 1, color: "#94a3b8" }, itemStyle: { color: "#94a3b8" } },
         ],
       }, true);
+
+      // 历史排名曲线（1 = 同类最强，y 轴反转使强者在上）
+      if (d.rank_hist && d.rank_hist.length) {
+        const maxRank = Math.max(...d.rank_hist.filter(v => v != null), d.hot_n || 10);
+        chart("chart-rank").setOption({
+          animation: false,
+          tooltip: { trigger: "axis", valueFormatter: v => v == null ? "—" : "第 " + v + " 名" },
+          grid: { left: 45, right: 15, top: 15, bottom: 40 },
+          xAxis: { type: "category", data: d.dates },
+          yAxis: { inverse: true, min: 1, max: Math.ceil(maxRank / 10) * 10,
+                   splitNumber: 3, name: "名次", nameTextStyle: { fontSize: 10 } },
+          dataZoom: [{ type: "inside" }],
+          series: [{
+            name: "涨幅排名", type: "line", data: d.rank_hist, showSymbol: false,
+            connectNulls: false, lineStyle: { width: 1.2, color: "#0ea5e9" },
+            itemStyle: { color: "#0ea5e9" },
+            areaStyle: { opacity: 0.06, color: "#0ea5e9" },
+            markLine: {
+              symbol: "none", silent: true,
+              data: [{ yAxis: d.hot_n || 10,
+                       lineStyle: { type: "dashed", color: "#ef4444" },
+                       label: { formatter: "上榜线 " + (d.hot_n || 10), color: "#ef4444", fontSize: 10 } }],
+            },
+          }],
+        }, true);
+      }
     }
 
     const filteredMembers = computed(() => {

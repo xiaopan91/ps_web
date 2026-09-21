@@ -42,6 +42,21 @@ def _market_benchmark() -> pd.Series:
     return (1 + mkt / 100).cumprod()
 
 
+def _rank_matrix(btype: str):
+    """该类型全部板块的逐日涨幅名次矩阵（缓存）。返回 (rank_df, hot_n)。"""
+    key = ("rank", btype)
+    hit = _CACHE.get(key)
+    if hit and time.time() - hit[0] < _TTL:
+        return hit[1]
+    df = _load_boards(btype)
+    piv = df.pivot_table(index="trade_date", columns="board_code",
+                         values="ret_eq", aggfunc="first")
+    hot_n = min(10, max(5, round(piv.shape[1] * 0.08)))
+    rank = piv.rank(ascending=False, axis=1)
+    _CACHE[key] = (time.time(), (rank, hot_n))
+    return rank, hot_n
+
+
 @router.get("/overview")
 def overview(type: str = Query(default="sw_l2")):
     """板块快照：多窗口涨幅、相对强弱排名（累计 + 30 日窗口）+ 趋势摘要。"""
@@ -90,10 +105,11 @@ def overview(type: str = Query(default="sw_l2")):
         "share_chg": share_chg.reindex(cum.columns).values,
         "turnover_med": latest["turnover_med"].reindex(cum.columns).values,
         "circ_mv": latest["circ_mv"].reindex(cum.columns).values,
-    }).sort_values("r20", ascending=False)
-    rows["momentum_rank"] = range(1, len(rows) + 1)
+    })
 
-    # 热度：每日等权涨幅排名，进入前 N 记为上榜（板块少的类型自适应下调上榜线）
+    # 热度：每日等权涨幅排名，进入前 N 记为上榜（板块少的类型自适应下调上榜线）。
+    # 注意：rank/streak 列必须在 sort_values 之前以与行同序的数组并入，
+    # 排序后再按位置赋值会与排序后的行错位（今日名次对不上涨幅的根因）
     n_boards = len(cum.columns)
     hot_n = min(10, max(5, round(n_boards * 0.08)))
     rank_df = piv.rank(ascending=False, axis=1)
@@ -109,6 +125,9 @@ def overview(type: str = Query(default="sw_l2")):
     rows["rank_today"] = rank_today.reindex(cum.columns).fillna(hot_n + 1).astype(int).values
     rows["streak"] = streak_today.values
     rows["hits5"] = hits5.reindex(cum.columns).fillna(0).astype(int).values
+
+    rows = rows.sort_values("r20", ascending=False)
+    rows["momentum_rank"] = range(1, len(rows) + 1)
 
     def tops(s: pd.Series, k=3, asc=False):
         s = s.dropna().sort_values(ascending=asc).head(k)
@@ -202,10 +221,18 @@ def detail(board_code: str, days: int = Query(default=250, ge=30, le=3000)):
     def col(s, d=2):
         return [None if pd.isna(v) else round(float(v), d) for v in s]
 
+    # 历史排名曲线：该板块每日涨幅在同类板块中的名次（1 = 最强）
+    btype = df["board_type"].iloc[0]
+    rank_mat, hot_n = _rank_matrix(btype)
+    rk = (rank_mat[board_code].reindex(df["trade_date"])
+          if board_code in rank_mat.columns
+          else pd.Series(np.nan, index=df["trade_date"]))
+    rank_hist = [None if pd.isna(v) else int(v) for v in rk]
+
     return {
         "board_code": board_code,
         "board_name": df["board_name"].iloc[0],
-        "board_type": df["board_type"].iloc[0],
+        "board_type": btype,
         "dates": [d.isoformat() for d in df["trade_date"]],
         "nav_eq": col(nav_eq),        # theme=官方指数净值（期初=100）；申万=等权自建
         "nav_cap": col(nav_cap),      # 申万=加权自建；theme 同官方
@@ -213,4 +240,6 @@ def detail(board_code: str, days: int = Query(default=250, ge=30, le=3000)):
         "amount_share": col(df["amount_share"], 3),
         "up_ratio": col(up_ratio, 1),
         "turnover_med": col(df["turnover_med"]),
+        "rank_hist": rank_hist,
+        "hot_n": hot_n,
     }

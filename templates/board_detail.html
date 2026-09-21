@@ -61,6 +61,10 @@
           <div id="chart-share" class="chart-sm"></div>
         </div></div></div>
         <div class="col-12 col-lg-6"><div class="card"><div class="card-body">
+          <h6 class="card-title small text-muted mb-1">每日涨幅排名（{{ typeName || '同类' }}内，1 = 最强，虚线为上榜线）</h6>
+          <div id="chart-rank" class="chart-sm"></div>
+        </div></div></div>
+        <div class="col-12 col-lg-6"><div class="card"><div class="card-body">
           <h6 class="card-title small text-muted mb-1">最新快照指标</h6>
           <div class="row g-2 pt-1" v-if="snapCards.length">
             <div class="col-4" v-for="c in snapCards" :key="c.label">
@@ -123,6 +127,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/board_detail.js?v=20260922"></script>
+  <script src="/static/js/board_detail.js?v=20260922-2"></script>
 </body>
 </html>

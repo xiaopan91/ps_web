@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>行业观察 · ps_web</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .chart { width: 100%; height: 300px; }
+    .chart-sm { width: 100%; height: 240px; }
+    .up { color: #ef4444; }
+    .down { color: #22c55e; }
+    table.mom td, table.mom th { font-size: .82rem; white-space: nowrap; }
+    tr.row-click { cursor: pointer; }
+    tr.row-active td { background: #eef4ff; }
+    .summary-line b { color: #212529; }
+    .sticky-head th { position: sticky; top: 0; background: #fff; z-index: 1; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <nav class="navbar navbar-dark bg-dark">
+      <div class="container-fluid d-flex align-items-center">
+        <div class="d-flex align-items-center gap-3">
+          <a class="navbar-brand mb-0 h1" href="/">首页</a>
+          <a class="app-nav" href="/stock">个股行情</a>
+          <a class="app-nav" href="/index">指数行情</a>
+          <a class="app-nav active" href="/industry">行业观察</a>
+          <a class="app-nav" href="/stockpredict">个股预测</a>
+          <a class="app-nav" href="/predict">宏观预测</a>
+          <a class="app-nav" href="/strategy">买卖策略</a>
+        </div>
+        <a class="app-nav ms-auto" href="/tasks">任务中心</a>
+      </div>
+    </nav>
+
+    <main class="container my-3">
+      <h5 class="mb-1">行业观察
+        <span class="text-muted small fw-normal">A股行业趋势：动量 / 相对强弱 / 资金迁移</span>
+      </h5>
+
+      <!-- 趋势摘要条 -->
+      <div class="alert alert-light border small py-2 mt-2" v-if="summary && summary.latest_date">
+        <span class="summary-line">
+          截至 <b>{{ summary.latest_date }}</b>，近20日
+          最强：<b v-for="(s,i) in summary.strong20" :key="'s'+i">{{ i? '、':'' }}{{ s.industry }} <span class="up">+{{ s.v }}%</span></b>；
+          最弱：<b v-for="(s,i) in summary.weak20" :key="'w'+i">{{ i? '、':'' }}{{ s.industry }} <span class="down">{{ s.v }}%</span></b>。
+          资金迁移（成交占比变化）：流入 <b v-for="(s,i) in summary.flow_in" :key="'fi'+i">{{ i? '、':'' }}{{ s.industry }} +{{ s.v }}pp</b>，
+          流出 <b v-for="(s,i) in summary.flow_out" :key="'fo'+i">{{ i? '、':'' }}{{ s.industry }} {{ s.v }}pp</b>。
+          全市场等权近20日 <b :class="summary.mkt_r20>=0?'up':'down'">{{ summary.mkt_r20 }}%</b>，
+          <b>{{ summary.beat_market }}</b>/{{ summary.total }} 个行业跑赢。
+        </span>
+      </div>
+      <div class="text-muted small" v-if="loading">加载中…</div>
+
+      <!-- 行业动量表 -->
+      <div class="card mb-3"><div class="card-body">
+        <div class="d-flex align-items-center gap-3 mb-2">
+          <h6 class="card-title mb-0">行业动量表</h6>
+          <input class="form-control form-control-sm" style="max-width:200px"
+                 v-model="keyword" placeholder="筛选行业名…">
+          <span class="text-muted small ms-auto">点击行查看趋势详情</span>
+        </div>
+        <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+          <table class="table table-sm table-hover mom sticky-head mb-0">
+            <thead>
+              <tr>
+                <th @click="sortBy('industry')">行业</th>
+                <th class="text-end" @click="sortBy('n_stocks')">家数</th>
+                <th class="text-end" @click="sortBy('r1')">今日</th>
+                <th class="text-end" @click="sortBy('r5')">5日</th>
+                <th class="text-end" @click="sortBy('r20')">20日</th>
+                <th class="text-end" @click="sortBy('r60')">60日</th>
+                <th class="text-end" @click="sortBy('up_ratio')">今日上涨占比</th>
+                <th class="text-end" @click="sortBy('rs_rank')">RS排名</th>
+                <th class="text-end" @click="sortBy('rs_chg')">RS变化</th>
+                <th class="text-end" @click="sortBy('share')">成交占比</th>
+                <th class="text-end" @click="sortBy('share_chg')">占比变化</th>
+                <th class="text-end" @click="sortBy('turnover_med')">换手中位</th>
+                <th class="text-end" @click="sortBy('circ_mv')">流通市值(亿)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in filteredRows" :key="r.industry"
+                  class="row-click" :class="{'row-active': r.industry===sel}"
+                  @click="selectIndustry(r.industry)">
+                <td><strong>{{ r.industry }}</strong></td>
+                <td class="text-end text-muted">{{ r.n_stocks }}</td>
+                <td class="text-end" :class="xcls(r.r1)">{{ fx(r.r1) }}</td>
+                <td class="text-end" :class="xcls(r.r5)">{{ fx(r.r5) }}</td>
+                <td class="text-end" :class="xcls(r.r20)">{{ fx(r.r20) }}</td>
+                <td class="text-end" :class="xcls(r.r60)">{{ fx(r.r60) }}</td>
+                <td class="text-end text-muted">{{ fx(r.up_ratio) }}</td>
+                <td class="text-end">{{ r.rs_rank }}</td>
+                <td class="text-end" :class="r.rs_chg>0?'up':(r.rs_chg<0?'down':'text-muted')">
+                  {{ r.rs_chg>0?'↑'+r.rs_chg:(r.rs_chg<0?'↓'+(-r.rs_chg):'—') }}</td>
+                <td class="text-end text-muted">{{ fx(r.share) }}</td>
+                <td class="text-end" :class="xcls(r.share_chg)">{{ fx(r.share_chg, 2) }}</td>
+                <td class="text-end text-muted">{{ fx(r.turnover_med) }}</td>
+                <td class="text-end text-muted">{{ fmtYi(r.circ_mv) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="text-muted small mt-2">
+          口径：行业为 tushare 分类（非申万官方指数）；涨幅按行业内个股等权收益累乘的净值折算；
+          RS = 行业等权净值 / 全市场等权净值，排名数值越小越强，变化为 20 个交易日前的名次差；
+          成交占比为行业成交额占全市场比，变化为 20 日差（pp）。
+        </div>
+      </div></div>
+
+      <!-- 单行业详情 -->
+      <div v-if="sel">
+        <div class="d-flex align-items-center gap-3 mb-2">
+          <h6 class="mb-0">{{ sel }} <span class="text-muted small fw-normal">趋势详情</span></h6>
+          <div class="btn-group btn-group-sm" role="group">
+            <button v-for="d in dayOpts" :key="d" class="btn"
+                    :class="days===d ? 'btn-primary':'btn-outline-primary'"
+                    @click="days=d">{{ d }}日</button>
+          </div>
+        </div>
+        <div class="card mb-3"><div class="card-body">
+          <h6 class="card-title small text-muted mb-1">净值对比（期初=100）：等权 / 加权 / 全市场等权</h6>
+          <div id="chart-nav" class="chart"></div>
+        </div></div>
+        <div class="row g-3">
+          <div class="col-12 col-lg-6"><div class="card"><div class="card-body">
+            <h6 class="card-title small text-muted mb-1">相对强弱 RS（行业等权 / 全市场等权 ×100，>100 强于大盘）</h6>
+            <div id="chart-rs" class="chart-sm"></div>
+          </div></div></div>
+          <div class="col-12 col-lg-6"><div class="card"><div class="card-body">
+            <h6 class="card-title small text-muted mb-1">成交占比 % 与上涨家数占比 %</h6>
+            <div id="chart-share" class="chart-sm"></div>
+          </div></div></div>
+        </div>
+      </div>
+      <div class="text-muted small mb-4" v-else>点击上方表格中的行业查看趋势详情。</div>
+    </main>
+  </div>
+
+  <script src="/static/vendor/vue/vue.global.prod.js"></script>
+  <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="/static/vendor/echarts/echarts.min.js"></script>
+  <script src="/static/js/industry.js?v=20260921"></script>
+</body>
+</html>

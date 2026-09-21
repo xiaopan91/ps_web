@@ -36,9 +36,16 @@
     </nav>
 
     <main class="container my-3">
-      <h5 class="mb-1">行业观察
-        <span class="text-muted small fw-normal">A股行业趋势：动量 / 相对强弱 / 资金迁移</span>
+      <h5 class="mb-1">板块观察
+        <span class="text-muted small fw-normal">申万行业层级 + 中证主题指数：动量 / 相对强弱 / 资金迁移</span>
       </h5>
+
+      <!-- 板块类型页签 -->
+      <ul class="nav nav-tabs mb-2">
+        <li class="nav-item" v-for="t in boardTypes" :key="t.k">
+          <a class="nav-link" href="#" :class="{active: type===t.k}" @click.prevent="type=t.k">{{ t.label }}</a>
+        </li>
+      </ul>
 
       <!-- 趋势摘要条 -->
       <div class="alert alert-light border small py-2 mt-2" v-if="summary && summary.latest_date">
@@ -49,7 +56,7 @@
           资金迁移（成交占比变化）：流入 <b v-for="(s,i) in summary.flow_in" :key="'fi'+i">{{ i? '、':'' }}{{ s.industry }} +{{ s.v }}pp</b>，
           流出 <b v-for="(s,i) in summary.flow_out" :key="'fo'+i">{{ i? '、':'' }}{{ s.industry }} {{ s.v }}pp</b>。
           全市场等权近20日 <b :class="summary.mkt_r20>=0?'up':'down'">{{ summary.mkt_r20 }}%</b>，
-          <b>{{ summary.beat_market }}</b>/{{ summary.total }} 个行业跑赢。
+          <b>{{ summary.beat_market }}</b>/{{ summary.total }} 个板块跑赢。
         </span>
       </div>
       <div class="text-muted small" v-if="loading">加载中…</div>
@@ -59,14 +66,14 @@
         <div class="d-flex align-items-center gap-3 mb-2">
           <h6 class="card-title mb-0">行业动量表</h6>
           <input class="form-control form-control-sm" style="max-width:200px"
-                 v-model="keyword" placeholder="筛选行业名…">
+                 v-model="keyword" placeholder="筛选板块名…">
           <span class="text-muted small ms-auto">点击行查看趋势详情</span>
         </div>
         <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
           <table class="table table-sm table-hover mom sticky-head mb-0">
             <thead>
               <tr>
-                <th @click="sortBy('industry')">行业</th>
+                <th @click="sortBy('name')">板块</th>
                 <th class="text-end" @click="sortBy('n_stocks')">家数</th>
                 <th class="text-end" @click="sortBy('r1')">今日</th>
                 <th class="text-end" @click="sortBy('r5')">5日</th>
@@ -86,7 +93,8 @@
               <tr v-for="r in filteredRows" :key="r.industry"
                   class="row-click" :class="{'row-active': r.industry===sel}"
                   @click="selectIndustry(r.industry)">
-                <td><strong>{{ r.industry }}</strong></td>
+                <td><strong>{{ r.name || r.industry }}</strong>
+                  <span class="text-muted small" v-if="showCode">{{ r.industry }}</span></td>
                 <td class="text-end text-muted">{{ r.n_stocks }}</td>
                 <td class="text-end" :class="xcls(r.r1)">{{ fx(r.r1) }}</td>
                 <td class="text-end" :class="xcls(r.r5)">{{ fx(r.r5) }}</td>
@@ -106,18 +114,18 @@
           </table>
         </div>
         <div class="text-muted small mt-2">
-          口径：行业为 tushare 分类（非申万官方指数）；涨幅按行业内个股等权收益累乘的净值折算；
-          RS = 行业等权净值 / 全市场等权净值，排名数值越小越强，变化为 20 个交易日前的名次差；
-          RS 排名为 <b>2016 年至今累计口径</b>（长跑总分，滞后），「30日RS」排名只用最近 30 个
-          交易日窗口计算（短期轮动敏感，≤20 强势 / ≥90 弱势着色）；两者背离时以 30 日口径看近期轮动方向。
-          成交占比为行业成交额占全市场比，变化为 20 日差（pp）。
+          口径：申万板块（L1/L2/L3，成分取自 index_member_all 当前成分）的收益为成分股等权/流通市值加权
+          自建聚合；主题指数（23 个中证/国证预置清单）的涨幅直接取官方指数日线，成分=最新月末快照
+          （历史成分变动未回溯，属近似）。RS = 板块净值 / 全市场等权净值（全市场等权由申万二级家数加权合成），
+          RS 排名为 2016 年至今累计口径（长跑总分，滞后），「30日RS」只用最近 30 个交易日窗口
+          （短期轮动敏感，≤20 强势 / ≥90 弱势着色）；成交占比为板块成交额占全市场比，变化为 20 日差（pp）。
         </div>
       </div></div>
 
-      <!-- 单行业详情 -->
+      <!-- 单板块详情 -->
       <div v-if="sel">
         <div class="d-flex align-items-center gap-3 mb-2">
-          <h6 class="mb-0">{{ sel }} <span class="text-muted small fw-normal">趋势详情</span></h6>
+          <h6 class="mb-0">{{ detailName }} <span class="text-muted small fw-normal">趋势详情</span></h6>
           <div class="btn-group btn-group-sm" role="group">
             <button v-for="d in dayOpts" :key="d" class="btn"
                     :class="days===d ? 'btn-primary':'btn-outline-primary'"
@@ -125,7 +133,9 @@
           </div>
         </div>
         <div class="card mb-3"><div class="card-body">
-          <h6 class="card-title small text-muted mb-1">净值对比（期初=100）：等权 / 加权 / 全市场等权</h6>
+          <h6 class="card-title small text-muted mb-1">{{ isTheme
+            ? '净值对比（期初=100）：官方指数 / 全市场等权'
+            : '净值对比（期初=100）：等权 / 加权 / 全市场等权' }}</h6>
           <div id="chart-nav" class="chart"></div>
         </div></div>
         <div class="row g-3">
@@ -139,13 +149,13 @@
           </div></div></div>
         </div>
       </div>
-      <div class="text-muted small mb-4" v-else>点击上方表格中的行业查看趋势详情。</div>
+      <div class="text-muted small mb-4" v-else>点击上方表格中的板块查看趋势详情。</div>
     </main>
   </div>
 
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/industry.js?v=20260921"></script>
+  <script src="/static/js/industry.js?v=20260921-3"></script>
 </body>
 </html>

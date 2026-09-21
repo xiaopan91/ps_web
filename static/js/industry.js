@@ -1,4 +1,4 @@
-// 行业观察：行业动量表 + 单行业趋势详情
+// 板块观察：申万层级 / 主题指数的动量表 + 单板块趋势详情
 const { createApp, computed, nextTick, onMounted, ref, watch } = Vue;
 
 const app = createApp({
@@ -14,37 +14,47 @@ const app = createApp({
     const dayOpts = [120, 250, 500, 1000];
     const detail = ref(null);
     const charts = {};
+    const boardTypes = [
+      { k: "sw_l2", label: "申万二级" }, { k: "sw_l1", label: "申万一级" },
+      { k: "sw_l3", label: "申万三级" }, { k: "theme", label: "主题指数" },
+    ];
+    const type = ref("sw_l2");
 
     // ---- URL 参数 ----
     function readUrl() {
       const p = new URLSearchParams(location.search);
+      if (p.get("type") && boardTypes.some(t => t.k === p.get("type"))) type.value = p.get("type");
       if (p.get("industry")) sel.value = p.get("industry");
       if (p.get("days")) days.value = +p.get("days") || 250;
     }
     readUrl();
     function syncUrl() {
-      const p = new URLSearchParams();
+      const p = new URLSearchParams({ type: type.value, days: days.value });
       if (sel.value) p.set("industry", sel.value);
-      p.set("days", days.value);
       history.replaceState(null, "", `/industry?${p}`);
     }
 
+    let ovSeq = 0;   // 请求序号：快速切换类型时丢弃慢返回的旧响应
     async function loadOverview() {
+      const seq = ++ovSeq;
       loading.value = true;
+      sel.value = null;   // 切类型后原选中板块可能不存在，先清空
+      detail.value = null;
       try {
-        const res = await fetch("/api/industry/overview");
+        const res = await fetch(`/api/industry/overview?type=${type.value}`);
         const data = res.ok ? await res.json() : null;
+        if (seq !== ovSeq) return;
         rows.value = data?.rows || [];
         summary.value = data?.summary || null;
       } catch (e) { /* 静默 */ }
-      finally { loading.value = false; }
+      finally { if (seq === ovSeq) loading.value = false; }
     }
 
     async function loadDetail() {
       if (!sel.value) return;
       try {
         const res = await fetch(
-          `/api/industry/detail?industry=${encodeURIComponent(sel.value)}&days=${days.value}`);
+          `/api/industry/detail?board_code=${encodeURIComponent(sel.value)}&days=${days.value}`);
         detail.value = res.ok ? await res.json() : null;
       } catch (e) { detail.value = null; }
       syncUrl();
@@ -59,7 +69,9 @@ const app = createApp({
 
     const filteredRows = computed(() => {
       const kw = keyword.value.trim();
-      const list = kw ? rows.value.filter(r => r.industry.includes(kw)) : rows.value;
+      const list = kw
+        ? rows.value.filter(r => (r.name || "").includes(kw) || (r.industry || "").includes(kw))
+        : rows.value;
       const k = sortKey.value, asc = sortAsc.value;
       return [...list].sort((a, b) => {
         const va = a[k], vb = b[k];
@@ -69,6 +81,11 @@ const app = createApp({
         return asc ? va - vb : vb - va;
       });
     });
+
+    const detailName = computed(() =>
+      detail.value?.board_name || sel.value || "");
+    const isTheme = computed(() => detail.value?.board_type === "theme");
+    const showCode = computed(() => type.value !== "sw_l1");
 
     function sortBy(k) {
       if (sortKey.value === k) sortAsc.value = !sortAsc.value;
@@ -91,6 +108,12 @@ const app = createApp({
         name, type: "line", data, showSymbol: false,
         lineStyle: { width: 1.3, color, ...extra }, itemStyle: { color }, ...{},
       });
+      const series = isTheme.value
+        ? [mk("官方指数净值", d.nav_eq, "#3b82f6"),
+           mk("全市场等权", d.mkt_nav, "#f59e0b", { type: "dashed", width: 1 })]
+        : [mk("等权净值", d.nav_eq, "#3b82f6"),
+           mk("加权净值", d.nav_cap, "#a855f7", { type: "dashed", width: 1 }),
+           mk("全市场等权", d.mkt_nav, "#f59e0b", { type: "dashed", width: 1 })];
       chart("chart-nav").setOption({
         animation: false,
         tooltip: { trigger: "axis" },
@@ -99,11 +122,7 @@ const app = createApp({
         xAxis: { type: "category", data: d.dates },
         yAxis: { scale: true, splitNumber: 4 },
         dataZoom: [{ type: "inside" }, { type: "slider", height: 16, bottom: 6 }],
-        series: [
-          mk("等权净值", d.nav_eq, "#3b82f6"),
-          mk("加权净值", d.nav_cap, "#a855f7", { type: "dashed", width: 1 }),
-          mk("全市场等权", d.mkt_nav, "#f59e0b", { type: "dashed", width: 1 }),
-        ],
+        series,
       }, true);
       chart("chart-rs").setOption({
         animation: false,
@@ -138,11 +157,12 @@ const app = createApp({
     }
 
     watch(days, loadDetail);
+    watch(type, () => { syncUrl(); loadOverview(); });
 
     onMounted(async () => {
       await loadOverview();
       if (sel.value) {
-        // URL 指定的行业可能不在表里，仅当存在时加载详情
+        // URL 指定的板块可能不在当前类型里，仅当存在时加载详情
         if (rows.value.some(r => r.industry === sel.value)) loadDetail();
         else sel.value = null;
       }
@@ -152,6 +172,7 @@ const app = createApp({
 
     return {
       rows, summary, loading, keyword, sortBy, filteredRows, sortAsc,
+      boardTypes, type, detailName, isTheme, showCode,
       sel, days, dayOpts, selectIndustry, fx, fmtYi, xcls,
     };
   },

@@ -115,6 +115,12 @@ def grid_lab_page():
     return FileResponse(TEMPLATES_DIR / "grid_lab.html")
 
 
+@app.get("/strategy/pa", include_in_schema=False)
+def pa_lab_page():
+    """定投实验室（等额定投/等价值定投/一次性买入）。"""
+    return FileResponse(TEMPLATES_DIR / "pa.html")
+
+
 @app.get("/tasks", include_in_schema=False)
 def tasks_page():
     """任务中心。"""

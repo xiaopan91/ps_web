@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>定投实验室 · ps_web</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .chart { width: 100%; height: 300px; }
+    .chart-sm { width: 100%; height: 260px; }
+    .nav-tabs .nav-link { color: #495057; }
+    .nav-tabs .nav-link.active { font-weight: 600; }
+    .metric-card .card-body { padding: .6rem .85rem; }
+    .metric-card .m-value { font-size: 1.15rem; font-weight: 650; }
+    .metric-card .m-sub { font-size: .72rem; }
+    .best-badge { font-size: .68rem; }
+    table.compare td, table.compare th { font-size: .82rem; white-space: nowrap; }
+    .up { color: #ef4444; }
+    .down { color: #22c55e; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <nav class="navbar navbar-dark bg-dark">
+      <div class="container-fluid d-flex align-items-center">
+        <div class="d-flex align-items-center gap-3">
+          <a class="navbar-brand mb-0 h1" href="/">首页</a>
+          <a class="app-nav" href="/stock">个股行情</a>
+          <a class="app-nav" href="/index">指数行情</a>
+          <a class="app-nav" href="/stockpredict">个股预测</a>
+          <a class="app-nav" href="/predict">宏观预测</a>
+          <a class="app-nav active" href="/strategy">买卖策略</a>
+        </div>
+        <a class="app-nav ms-auto" href="/tasks">任务中心</a>
+      </div>
+    </nav>
+
+    <main class="container my-3">
+      <a class="text-muted small text-decoration-none" href="/strategy">← 买卖策略</a>
+      <h5 class="mt-1 mb-3">定投实验室
+        <span class="text-muted small fw-normal">等额定投 · 等价值定投 · 一次性买入，同口径对比</span>
+      </h5>
+
+      <!-- 参数区 -->
+      <div class="card mb-3"><div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+          <div class="col-6 col-lg-2" v-show="tab !== 'compare'">
+            <label class="form-label small text-muted mb-0">指数</label>
+            <select class="form-select form-select-sm" v-model="code">
+              <option v-for="i in indices" :key="i.ts_code" :value="i.ts_code">
+                {{ i.name }}
+              </option>
+            </select>
+          </div>
+          <div class="col-6 col-lg-2">
+            <label class="form-label small text-muted mb-0">起始日期</label>
+            <input type="date" class="form-control form-control-sm" v-model="start">
+          </div>
+          <div class="col-6 col-lg-1">
+            <label class="form-label small text-muted mb-0">频率</label>
+            <select class="form-select form-select-sm" v-model="freq">
+              <option value="month">月</option>
+              <option value="week">周</option>
+            </select>
+          </div>
+          <div class="col-6 col-lg-2">
+            <label class="form-label small text-muted mb-0">每期金额（元）</label>
+            <input type="number" class="form-control form-control-sm" v-model.number="amount" min="100" step="100">
+          </div>
+          <div class="col-6 col-lg-2">
+            <label class="form-label small text-muted mb-0">VA 路径</label>
+            <select class="form-select form-select-sm" v-model="pathType">
+              <option value="linear">线性（每期+C）</option>
+              <option value="growth">增长（年增 g）</option>
+            </select>
+          </div>
+          <div class="col-6 col-lg-1" v-show="pathType === 'growth'">
+            <label class="form-label small text-muted mb-0">g/年</label>
+            <input type="number" class="form-control form-control-sm" v-model.number="growth" step="0.01">
+          </div>
+          <div class="col-6 col-lg-2">
+            <label class="form-label small text-muted mb-0 d-block">VA 行为</label>
+            <div class="form-check form-check-inline small">
+              <input class="form-check-input" type="checkbox" id="allowSell" v-model="allowSell">
+              <label class="form-check-label" for="allowSell">允许卖出</label>
+            </div>
+          </div>
+          <div class="col-6 col-lg-1">
+            <label class="form-label small text-muted mb-0">上限×C</label>
+            <input type="number" class="form-control form-control-sm" v-model.number="maxK" min="0" step="0.5">
+          </div>
+        </div>
+        <div class="text-muted small mt-2" v-if="loading">回测计算中…</div>
+        <div class="text-danger small mt-2" v-if="error">{{ error }}</div>
+      </div></div>
+
+      <!-- 页签 -->
+      <ul class="nav nav-tabs">
+        <li class="nav-item"><a class="nav-link" href="#" :class="{active: tab==='dca'}"
+           @click.prevent="tab='dca'">等额定投</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" :class="{active: tab==='va'}"
+           @click.prevent="tab='va'">等价值定投</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" :class="{active: tab==='compare'}"
+           @click.prevent="tab='compare'">全指数对比</a></li>
+      </ul>
+
+      <!-- Tab: 等额定投 -->
+      <div v-show="tab==='dca'" class="pt-3">
+        <div class="text-muted small mb-2" v-if="bt">
+          {{ bt.info.name }} · {{ bt.info.first }} ~ {{ bt.info.last }} · {{ bt.info.n_periods }} 期投入
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-md-4 col-lg-2" v-for="c in dcaCards" :key="c.label">
+            <div class="card metric-card h-100"><div class="card-body">
+              <div class="text-muted small">{{ c.label }}</div>
+              <div class="m-value" :class="c.cls">{{ c.value }}</div>
+              <div class="m-sub text-muted" v-if="c.sub">{{ c.sub }}</div>
+            </div></div>
+          </div>
+        </div>
+        <div class="card mb-3"><div class="card-body">
+          <h6 class="card-title small text-muted mb-1">账户收益率（账户/累计投入）对比：DCA vs 一次性买入 vs 指数</h6>
+          <div id="chart-account-dca" class="chart"></div>
+        </div></div>
+        <div class="row g-3">
+          <div class="col-12 col-lg-6"><div class="card"><div class="card-body">
+            <h6 class="card-title small text-muted mb-1">累计投入 vs 账户总值</h6>
+            <div id="chart-flows-dca" class="chart-sm"></div>
+          </div></div></div>
+          <div class="col-12 col-lg-6"><div class="card"><div class="card-body">
+            <h6 class="card-title small text-muted mb-1">逐期投入</h6>
+            <div id="chart-invest-dca" class="chart-sm"></div>
+          </div></div></div>
+        </div>
+      </div>
+
+      <!-- Tab: 等价值定投 -->
+      <div v-show="tab==='va'" class="pt-3">
+        <div class="alert alert-light border small py-2" v-if="bt">
+          等价值定投：每期把持仓市值补齐到目标路径（{{ pathType==='linear'
+            ? '线性 = 每期 +' + amount + ' 元'
+            : '增长 = 每期 +' + amount + ' 元、路径年增 ' + (growth*100).toFixed(1) + '%' }}）。
+          跌破路径多买、越过路径{{ allowSell ? '卖出止盈' : '停止买入' }}；
+          单期买入上限 {{ maxK > 0 ? maxK + '×每期金额' : '不设限' }}。
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-md-4 col-lg-2" v-for="c in vaCards" :key="c.label">
+            <div class="card metric-card h-100"><div class="card-body">
+              <div class="text-muted small">{{ c.label }}</div>
+              <div class="m-value" :class="c.cls">{{ c.value }}</div>
+              <div class="m-sub text-muted" v-if="c.sub">{{ c.sub }}</div>
+            </div></div>
+          </div>
+        </div>
+        <div class="card mb-3"><div class="card-body">
+          <h6 class="card-title small text-muted mb-1">账户收益率对比：VA vs DCA vs 一次性买入 vs 指数</h6>
+          <div id="chart-account-va" class="chart"></div>
+        </div></div>
+        <div class="row g-3">
+          <div class="col-12 col-lg-6"><div class="card"><div class="card-body">
+            <h6 class="card-title small text-muted mb-1">累计投入 vs 账户总值</h6>
+            <div id="chart-flows-va" class="chart-sm"></div>
+          </div></div></div>
+          <div class="col-12 col-lg-6"><div class="card"><div class="card-body">
+            <h6 class="card-title small text-muted mb-1">逐期投入（负值 = 卖出止盈）</h6>
+            <div id="chart-invest-va" class="chart-sm"></div>
+          </div></div></div>
+        </div>
+      </div>
+
+      <!-- Tab: 全指数对比 -->
+      <div v-show="tab==='compare'" class="pt-3">
+        <div class="text-muted small mb-2" v-if="compare">
+          起始 {{ compare.params.start }} · {{ compare.params.freq==='month'?'月':'周' }}投
+          {{ compare.params.amount }} 元 · VA 路径{{ compare.params.path_type==='linear'?'线性':'增长' }}
+          · 单期上限 {{ compare.params.max_inject_k || '不设' }} 倍
+        </div>
+        <div class="card"><div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover compare sticky-head mb-0">
+              <thead>
+                <tr>
+                  <th @click="sortBy('name')">指数</th>
+                  <th class="text-end" @click="sortBy('n_periods')">期数</th>
+                  <th class="text-end" @click="sortBy('dca_xirr')">DCA 年化</th>
+                  <th class="text-end" @click="sortBy('dca_profit_pct')">DCA 收益</th>
+                  <th class="text-end" @click="sortBy('dca_max_dd')">DCA 回撤</th>
+                  <th class="text-end" @click="sortBy('va_xirr')">VA 年化</th>
+                  <th class="text-end" @click="sortBy('va_profit_pct')">VA 收益</th>
+                  <th class="text-end" @click="sortBy('va_max_dd')">VA 回撤</th>
+                  <th class="text-end" @click="sortBy('va_max_single_inject')">VA 峰值投入</th>
+                  <th class="text-end" @click="sortBy('lump_xirr')">一次性年化</th>
+                  <th class="text-end" @click="sortBy('lump_profit_pct')">一次性收益</th>
+                  <th class="text-center">最优(XIRR)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in sortedRows" :key="r.code">
+                  <td>{{ r.name }} <span class="text-muted small">{{ r.code }}</span></td>
+                  <td class="text-end">{{ r.n_periods }}</td>
+                  <td class="text-end" :class="xcls(r.dca_xirr)">{{ fx(r.dca_xirr, '%') }}</td>
+                  <td class="text-end" :class="xcls(r.dca_profit_pct)">{{ fx(r.dca_profit_pct, '%') }}</td>
+                  <td class="text-end text-muted">{{ fx(r.dca_max_dd, '%') }}</td>
+                  <td class="text-end" :class="xcls(r.va_xirr)">{{ fx(r.va_xirr, '%') }}</td>
+                  <td class="text-end" :class="xcls(r.va_profit_pct)">{{ fx(r.va_profit_pct, '%') }}</td>
+                  <td class="text-end text-muted">{{ fx(r.va_max_dd, '%') }}</td>
+                  <td class="text-end text-muted">{{ fwan(r.va_max_single_inject) }}</td>
+                  <td class="text-end" :class="xcls(r.lump_xirr)">{{ fx(r.lump_xirr, '%') }}</td>
+                  <td class="text-end" :class="xcls(r.lump_profit_pct)">{{ fx(r.lump_profit_pct, '%') }}</td>
+                  <td class="text-center">
+                    <span class="badge text-bg-success best-badge" v-if="r.best">{{ bestName(r.best) }}</span>
+                    <span class="text-muted" v-else>—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="text-muted small mt-2">
+            口径：收益对比以 <strong>XIRR 年化</strong>为准（三者现金流时点不同，直接比累计收益不公平）；
+            「收益」= (期末账户 − 总投入)/总投入；「回撤」= 账户收益率（账户/累计投入−1）自峰顶的最大回落幅度（百分点），
+            持续投入不掩盖浮亏；VA 峰值投入 = 单期最大买入额，衡量深熊资金压力（本表受上限补丁约束为 3×每期金额）。
+            价格指数不含股息，对持有型策略（一次性/DCA）略有低估；VA 卖出现金停留在账户内按零收益计。
+          </div>
+        </div></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/vendor/vue/vue.global.prod.js"></script>
+  <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="/static/vendor/echarts/echarts.min.js"></script>
+  <script src="/static/js/pa.js?v=20260921"></script>
+</body>
+</html>

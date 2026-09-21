@@ -75,6 +75,7 @@
                 <th class="text-end" @click="sortBy('up_ratio')">今日上涨占比</th>
                 <th class="text-end" @click="sortBy('rs_rank')">RS排名</th>
                 <th class="text-end" @click="sortBy('rs_chg')">RS变化</th>
+                <th class="text-end" @click="sortBy('rs30_rank')" title="最近30个交易日窗口的相对强弱排名">30日RS</th>
                 <th class="text-end" @click="sortBy('share')">成交占比</th>
                 <th class="text-end" @click="sortBy('share_chg')">占比变化</th>
                 <th class="text-end" @click="sortBy('turnover_med')">换手中位</th>
@@ -95,6 +96,7 @@
                 <td class="text-end">{{ r.rs_rank }}</td>
                 <td class="text-end" :class="r.rs_chg>0?'up':(r.rs_chg<0?'down':'text-muted')">
                   {{ r.rs_chg>0?'↑'+r.rs_chg:(r.rs_chg<0?'↓'+(-r.rs_chg):'—') }}</td>
+                <td class="text-end" :class="r.rs30_rank<=20?'up':(r.rs30_rank>=90?'down':'')">{{ r.rs30_rank }}</td>
                 <td class="text-end text-muted">{{ fx(r.share) }}</td>
                 <td class="text-end" :class="xcls(r.share_chg)">{{ fx(r.share_chg, 2) }}</td>
                 <td class="text-end text-muted">{{ fx(r.turnover_med) }}</td>
@@ -106,6 +108,8 @@
         <div class="text-muted small mt-2">
           口径：行业为 tushare 分类（非申万官方指数）；涨幅按行业内个股等权收益累乘的净值折算；
           RS = 行业等权净值 / 全市场等权净值，排名数值越小越强，变化为 20 个交易日前的名次差；
+          RS 排名为 <b>2016 年至今累计口径</b>（长跑总分，滞后），「30日RS」排名只用最近 30 个
+          交易日窗口计算（短期轮动敏感，≤20 强势 / ≥90 弱势着色）；两者背离时以 30 日口径看近期轮动方向。
           成交占比为行业成交额占全市场比，变化为 20 日差（pp）。
         </div>
       </div></div>

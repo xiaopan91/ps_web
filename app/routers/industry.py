@@ -73,6 +73,15 @@ def overview():
     else:
         rs_chg = pd.Series(np.nan, index=cum.columns)
 
+    # 30 日窗口 RS：只用最近 30 个交易日的相对表现，对短期轮动敏感
+    if len(cum) > 30:
+        rs30 = ((cum.iloc[-1] / cum.iloc[-31])
+                / (mkt_cum.iloc[-1] / mkt_cum.iloc[-31])) * 100
+        rs30_rank = rs30.rank(ascending=False)
+    else:
+        rs30 = pd.Series(np.nan, index=cum.columns)
+        rs30_rank = pd.Series(np.nan, index=cum.columns)
+
     latest = df[df["trade_date"] == dates[-1]].set_index("industry")
     ago20 = (df[df["trade_date"] == dates[-21]].set_index("industry")
              if len(dates) > 20 else latest)
@@ -86,6 +95,8 @@ def overview():
         "up_ratio": up_ratio.reindex(cum.columns).values,
         "rs_rank": rs_rank.values.astype(int),
         "rs_chg": rs_chg.values,
+        "rs30": rs30.values,
+        "rs30_rank": rs30_rank.values.astype(int),
         "share": latest["amount_share"].reindex(cum.columns).values,
         "share_chg": share_chg.reindex(cum.columns).values,
         "turnover_med": latest["turnover_med"].reindex(cum.columns).values,

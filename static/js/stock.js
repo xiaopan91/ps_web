@@ -251,7 +251,9 @@ const app = createApp({
           sub: s.ann_vol != null ? `年化波动 ${s.ann_vol}%` : "" },
         { label: "52周区间", value: `${s.low_52w} ~ ${s.high_52w}`,
           sub: s.pos60 != null ? `60日位置 ${s.pos60}%` : "" },
-        { label: "PE(TTM)", value: fmt(s.pe), sub: s.pe == null ? "亏损或缺失" : "" },
+        { label: "PE(TTM)", value: fmt(s.pe),
+          sub: s.pe == null ? "亏损或缺失"
+            : (s.pe_pct != null ? `历史分位 ${s.pe_pct}%` + (s.pe_pct5 != null ? ` · 5年 ${s.pe_pct5}%` : "") : "") },
         { label: "换手率(流通)", value: fmt(s.turnover_f, 2, "%"),
           sub: s.amp20 != null ? `20日均振幅 ${s.amp20}%` : "" },
         { label: "量比", value: fmt(s.volume_ratio) },

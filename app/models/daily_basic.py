@@ -15,5 +15,6 @@ class DailyBasic(Base):
     turnover_rate_f = Column(DECIMAL(10, 4), comment="流通换手率（%）")
     volume_ratio = Column(DECIMAL(10, 4), comment="量比")
     pe = Column(DECIMAL(12, 4), comment="市盈率（总市值/净利润）")
+    pe_ttm = Column(DECIMAL(12, 4), comment="市盈率 TTM（总市值/滚动净利润，亏损为空）")
     circ_mv = Column(DECIMAL(18, 4), comment="流通市值（万元）")
     total_mv = Column(DECIMAL(18, 4), comment="总市值（万元）")

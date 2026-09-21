@@ -153,7 +153,7 @@ def metrics(
 
     df = pd.read_sql(text(
         "SELECT d.trade_date, d.high, d.low, d.close, d.pre_close, d.pct_chg, "
-        "       a.adj_factor, b.turnover_rate_f, b.volume_ratio, b.pe, "
+        "       a.adj_factor, b.turnover_rate_f, b.volume_ratio, b.pe, b.pe_ttm, "
         "       b.circ_mv, b.total_mv "
         "FROM daily_bar d "
         "LEFT JOIN adj_factor a ON a.ts_code = d.ts_code AND a.trade_date = d.trade_date "
@@ -163,7 +163,7 @@ def metrics(
     if df.empty:
         raise HTTPException(404, f"{code} 无行情数据")
     num_cols = ("high", "low", "close", "pre_close", "pct_chg", "adj_factor",
-                "turnover_rate_f", "volume_ratio", "pe", "circ_mv", "total_mv")
+                "turnover_rate_f", "volume_ratio", "pe", "pe_ttm", "circ_mv", "total_mv")
     for c in num_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
@@ -221,6 +221,26 @@ def metrics(
             ytd = (last_px / base_px - 1) * 100
     ann_vol = float(df["pct_chg"].std() * np.sqrt(244)) if df["pct_chg"].count() > 2 else None
 
+    # PE-TTM 历史分位：当前值在自身历史（2016 起）与近 5 年中的位置，
+    # 仅统计盈利期（pe_ttm > 0），亏损期不参与分位
+    pe_ttm_last = df["pe_ttm"].iloc[-1]
+    pe_pct = pe_pct5 = None
+    if pd.notna(pe_ttm_last) and pe_ttm_last > 0:
+        dist = db.execute(
+            text(
+                "SELECT COUNT(pe_ttm) AS n_all, SUM(pe_ttm <= :v) AS n_le, "
+                "       SUM(CASE WHEN trade_date >= :d5 THEN 1 ELSE 0 END) AS n5_all, "
+                "       SUM(CASE WHEN trade_date >= :d5 AND pe_ttm <= :v THEN 1 ELSE 0 END) AS n5_le "
+                "FROM daily_basic WHERE ts_code = :c AND pe_ttm > 0"
+            ),
+            {"c": code, "v": float(pe_ttm_last),
+             "d5": date.today() - timedelta(days=1825)},
+        ).fetchone()
+        if dist[0]:
+            pe_pct = round(float(dist[1] or 0) / float(dist[0]) * 100, 1)
+        if dist[2]:
+            pe_pct5 = round(float(dist[3] or 0) / float(dist[2]) * 100, 1)
+
     # 裁掉预热段，RS 在裁剪后归一（首日 = 1.0）；历史不足 60 日则不裁（滚动列为 NULL）
     c_qfq = df["close_qfq"].reset_index(drop=True)
     trim = 60 if len(df) > 60 else 0
@@ -238,7 +258,9 @@ def metrics(
         "date": dates[-1] if dates else None,
         "turnover_f": None if pd.isna(last["turnover_rate_f"]) else round(float(last["turnover_rate_f"]), 2),
         "volume_ratio": None if pd.isna(last["volume_ratio"]) else round(float(last["volume_ratio"]), 2),
-        "pe": None if pd.isna(last["pe"]) else round(float(last["pe"]), 2),
+        "pe": None if pd.isna(last["pe_ttm"]) else round(float(last["pe_ttm"]), 2),
+        "pe_pct": pe_pct,
+        "pe_pct5": pe_pct5,
         "circ_mv": None if pd.isna(last["circ_mv"]) else round(float(last["circ_mv"]) / 1e4, 2),
         "total_mv": None if pd.isna(last["total_mv"]) else round(float(last["total_mv"]) / 1e4, 2),
         "high_52w": round(high_52w, 2),
@@ -256,7 +278,7 @@ def metrics(
         "rs": _series(rs, 3),
         "turnover_f": _series(df["turnover_rate_f"], 3),
         "volume_ratio": _series(df["volume_ratio"], 3),
-        "pe": _series(df["pe"], 2),
+        "pe": _series(df["pe_ttm"], 2),
         "circ_mv": _series(df["circ_mv"] / 1e4, 2),
         "total_mv": _series(df["total_mv"] / 1e4, 2),
         "amp": _series(df["amp"], 3),

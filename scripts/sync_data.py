@@ -37,7 +37,7 @@ DAILY_COLS = ["ts_code", "trade_date", "open", "high", "low", "close",
               "pre_close", "change", "pct_chg", "vol", "amount"]
 ADJ_COLS = ["ts_code", "trade_date", "adj_factor"]
 BASIC_DAILY_COLS = ["ts_code", "trade_date", "turnover_rate", "turnover_rate_f",
-                    "volume_ratio", "pe", "circ_mv", "total_mv"]
+                    "volume_ratio", "pe", "pe_ttm", "circ_mv", "total_mv"]
 MARGIN_COLS = ["trade_date", "exchange_id", "rzye", "rzmre", "rzche",
                "rqye", "rzrqye"]
 FINA_COLS = ["ts_code", "ann_date", "end_date", "update_flag", "eps", "bps",
@@ -747,6 +747,29 @@ def recompute_industry(full=False):
 
 # ---------------------------------------------------------------- 板块体系
 
+def backfill_dbasic(start: date):
+    """逐日重拉 daily_basic 全市场（补 pe_ttm 等新增列的历史）。
+
+    按日先删后插幂等；一次调用返回当日全市场约 5500 行。
+    """
+    import app.models  # noqa: F401  注册 ORM 模型
+    Base.metadata.create_all(engine)
+    print(f"[dbasic] 逐日重拉 daily_basic（{start} 起）...")
+    t0 = time.time()
+    days = open_dates(start, date.today())
+    for i, d in enumerate(days, 1):
+        df = call_with_retry(f"daily_basic {d:%Y%m%d}", func="daily_basic",
+                             trade_date=f"{d:%Y%m%d}")
+        if df is not None and not df.empty:
+            df = df[BASIC_DAILY_COLS].copy()
+            df = df.dropna(subset=["turnover_rate_f"])   # 与既有入库口径一致
+            df["trade_date"] = df["trade_date"].map(to_date)
+            _delete_insert("daily_basic", df, "trade_date = :d", {"d": d})
+        if i % 100 == 0 or i == len(days):
+            print(f"  进度 {i}/{len(days)}，已用 {(time.time()-t0)/60:.1f}min")
+    print(f"[OK] daily_basic 回补完成 {len(days)} 天，用时 {(time.time()-t0)/60:.1f} 分钟")
+
+
 def sync_board():
     """重建板块目录与成分：申万 L1/L2/L3（当前成分）+ 主题指数（最新月末快照）。"""
     import calendar
@@ -933,6 +956,8 @@ def main():
     p_ind.add_argument("--full", action="store_true", help="全量重建（默认增量）")
     with_common(sub.add_parser("board", help="重建板块目录与成分（申万层级 + 主题指数）"))
     with_common(sub.add_parser("index_ext", help="同步主题指数官方日线（增量）"))
+    p_db = with_common(sub.add_parser("dbasic", help="逐日重拉 daily_basic（补 pe_ttm 等新增列）"))
+    p_db.add_argument("--start", default="20160101", help="开始日期 YYYYMMDD")
 
     args = parser.parse_args()
 
@@ -957,6 +982,8 @@ def main():
         sync_board()
     elif args.cmd == "index_ext":
         sync_index_ext()
+    elif args.cmd == "dbasic":
+        backfill_dbasic(date(int(args.start[:4]), int(args.start[4:6]), int(args.start[6:8])))
     else:
         {"cal": sync_cal, "basic": sync_basic,
          "index": lambda: sync_index(full=args.full),

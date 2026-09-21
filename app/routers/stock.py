@@ -221,25 +221,27 @@ def metrics(
             ytd = (last_px / base_px - 1) * 100
     ann_vol = float(df["pct_chg"].std() * np.sqrt(244)) if df["pct_chg"].count() > 2 else None
 
-    # PE-TTM 历史分位：当前值在自身历史（2016 起）与近 5 年中的位置，
-    # 仅统计盈利期（pe_ttm > 0），亏损期不参与分位
+    # PE-TTM 历史曲线与分位：全历史（2016 起），仅统计盈利期（pe_ttm > 0）
+    pe_full = pd.read_sql(text(
+        "SELECT trade_date, pe_ttm FROM daily_basic "
+        "WHERE ts_code = :c AND pe_ttm > 0 ORDER BY trade_date"),
+        engine, params={"c": code})
+    pe_full["pe_ttm"] = pd.to_numeric(pe_full["pe_ttm"], errors="coerce")
+    pe_full = pe_full.dropna(subset=["pe_ttm"])
+    pe_full["trade_date"] = pd.to_datetime(pe_full["trade_date"]).dt.date
     pe_ttm_last = df["pe_ttm"].iloc[-1]
     pe_pct = pe_pct5 = None
-    if pd.notna(pe_ttm_last) and pe_ttm_last > 0:
-        dist = db.execute(
-            text(
-                "SELECT COUNT(pe_ttm) AS n_all, SUM(pe_ttm <= :v) AS n_le, "
-                "       SUM(CASE WHEN trade_date >= :d5 THEN 1 ELSE 0 END) AS n5_all, "
-                "       SUM(CASE WHEN trade_date >= :d5 AND pe_ttm <= :v THEN 1 ELSE 0 END) AS n5_le "
-                "FROM daily_basic WHERE ts_code = :c AND pe_ttm > 0"
-            ),
-            {"c": code, "v": float(pe_ttm_last),
-             "d5": date.today() - timedelta(days=1825)},
-        ).fetchone()
-        if dist[0]:
-            pe_pct = round(float(dist[1] or 0) / float(dist[0]) * 100, 1)
-        if dist[2]:
-            pe_pct5 = round(float(dist[3] or 0) / float(dist[2]) * 100, 1)
+    pe_med = pe_q30 = pe_q70 = None
+    if not pe_full.empty:
+        pe_med = round(float(pe_full["pe_ttm"].median()), 2)
+        pe_q30 = round(float(pe_full["pe_ttm"].quantile(0.3)), 2)
+        pe_q70 = round(float(pe_full["pe_ttm"].quantile(0.7)), 2)
+        if pd.notna(pe_ttm_last) and pe_ttm_last > 0:
+            pe_pct = round(float((pe_full["pe_ttm"] <= pe_ttm_last).mean() * 100), 1)
+            d5 = date.today() - timedelta(days=1825)
+            p5 = pe_full[pe_full["trade_date"] >= d5]
+            if len(p5):
+                pe_pct5 = round(float((p5["pe_ttm"] <= pe_ttm_last).mean() * 100), 1)
 
     # 裁掉预热段，RS 在裁剪后归一（首日 = 1.0）；历史不足 60 日则不裁（滚动列为 NULL）
     c_qfq = df["close_qfq"].reset_index(drop=True)
@@ -285,6 +287,12 @@ def metrics(
         "atr_pct20": _series(df["atr_pct20"], 3),
         "pos60": _series(df["pos60"], 1),
         "stats": stats,
+        "pe_hist": {
+            "dates": [d.isoformat() for d in pe_full["trade_date"]],
+            "pe": _series(pe_full["pe_ttm"], 2),
+            "median": pe_med, "q30": pe_q30, "q70": pe_q70,
+            "pct": pe_pct, "pct5": pe_pct5,
+        },
     }
 
 

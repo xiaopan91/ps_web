@@ -227,6 +227,20 @@
           </div>
           <div class="col-12">
             <div class="card ana-card h-100"><div class="card-body">
+              <div class="d-flex justify-content-between align-items-center flex-wrap">
+                <h6 class="card-title mb-1">PE-TTM 历史曲线
+                  <span class="text-muted small fw-normal">全历史（2016 起）· 虚线为中位数与 30%/70% 分位</span>
+                </h6>
+                <span class="badge text-bg-light text-dark" v-if="stats && stats.pe_pct != null">
+                  当前 {{ stats.pe }} · 历史分位 {{ stats.pe_pct }}%
+                  <template v-if="stats.pe_pct5 != null"> · 5年分位 {{ stats.pe_pct5 }}%</template>
+                </span>
+              </div>
+              <div id="chart-pehist" style="width:100%;height:260px;"></div>
+            </div></div>
+          </div>
+          <div class="col-12">
+            <div class="card ana-card h-100"><div class="card-body">
               <h6 class="card-title">基本面
                 <span class="text-muted small fw-normal" v-if="funda && funda.latest">
                   {{ funda.latest.end_date.slice(0, 7) }} 报告期 · 公布于 {{ funda.latest.ann_date }}
@@ -252,6 +266,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/stock.js?v=20260913-5"></script>
+  <script src="/static/js/stock.js?v=20260922"></script>
 </body>
 </html>

@@ -398,6 +398,37 @@ const app = createApp({
         ],
       }, true);
 
+      // PE-TTM 历史曲线（全历史 + 分位线）
+      const ph = m.pe_hist;
+      if (ph && ph.dates && ph.dates.length) {
+        const mkLine = (y, color, label) => ({
+          yAxis: y, lineStyle: { color, type: "dashed", width: 1 },
+          label: { formatter: label, fontSize: 10, color },
+        });
+        anaChart("chart-pehist").setOption({
+          animation: false,
+          tooltip: { trigger: "axis" },
+          legend: { top: 0, textStyle: { fontSize: 11 } },
+          grid: { left: 55, right: 55, top: 15, bottom: 40 },
+          xAxis: { type: "category", data: ph.dates },
+          yAxis: { scale: true, splitNumber: 3 },
+          dataZoom: [{ type: "inside" }, { type: "slider", height: 14, bottom: 4 }],
+          series: [{
+            name: "PE-TTM", type: "line", data: ph.pe, showSymbol: false,
+            connectNulls: false, lineStyle: { width: 1.2, color: BLUE },
+            itemStyle: { color: BLUE },
+            markLine: {
+              symbol: "none", silent: true,
+              data: [
+                ...(ph.median != null ? [mkLine(ph.median, "#64748b", "中位 " + ph.median)] : []),
+                ...(ph.q30 != null ? [mkLine(ph.q30, "#22c55e", "30%分位 " + ph.q30)] : []),
+                ...(ph.q70 != null ? [mkLine(ph.q70, "#ef4444", "70%分位 " + ph.q70)] : []),
+              ],
+            },
+          }],
+        }, true);
+      }
+
       // 基本面：近 12 期营收/净利同比（季频柱状）
       const periods = (fd && fd.periods) || [];
       const qLabel = s => {

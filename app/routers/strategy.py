@@ -55,7 +55,7 @@ def _pa_params(
     path_type: str = Query(default="linear", pattern=r"^(linear|growth)$"),
     growth: float = Query(default=0.0, ge=-0.2, le=0.5),
     allow_sell: int = Query(default=1, ge=0, le=1),
-    max_inject_k: float = Query(default=3.0, ge=0, le=20),
+    max_inject_k: float = Query(default=3.0, alias="k", ge=0, le=20),
 ):
     return {"start": start, "freq": freq, "amount": amount,
             "path_type": path_type, "growth": growth,

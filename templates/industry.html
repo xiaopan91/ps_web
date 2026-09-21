@@ -80,9 +80,6 @@
                 <th class="text-end" @click="sortBy('r20')">20日</th>
                 <th class="text-end" @click="sortBy('r60')">60日</th>
                 <th class="text-end" @click="sortBy('up_ratio')">今日上涨占比</th>
-                <th class="text-end" @click="sortBy('rs_rank')">RS排名</th>
-                <th class="text-end" @click="sortBy('rs_chg')">RS变化</th>
-                <th class="text-end" @click="sortBy('rs30_rank')" title="最近30个交易日窗口的相对强弱排名">30日RS</th>
                 <th class="text-end" @click="sortBy('share')">成交占比</th>
                 <th class="text-end" @click="sortBy('share_chg')">占比变化</th>
                 <th class="text-end" @click="sortBy('turnover_med')">换手中位</th>
@@ -101,10 +98,6 @@
                 <td class="text-end" :class="xcls(r.r20)">{{ fx(r.r20) }}</td>
                 <td class="text-end" :class="xcls(r.r60)">{{ fx(r.r60) }}</td>
                 <td class="text-end text-muted">{{ fx(r.up_ratio) }}</td>
-                <td class="text-end">{{ r.rs_rank }}</td>
-                <td class="text-end" :class="r.rs_chg>0?'up':(r.rs_chg<0?'down':'text-muted')">
-                  {{ r.rs_chg>0?'↑'+r.rs_chg:(r.rs_chg<0?'↓'+(-r.rs_chg):'—') }}</td>
-                <td class="text-end" :class="r.rs30_rank<=20?'up':(r.rs30_rank>=90?'down':'')">{{ r.rs30_rank }}</td>
                 <td class="text-end text-muted">{{ fx(r.share) }}</td>
                 <td class="text-end" :class="xcls(r.share_chg)">{{ fx(r.share_chg, 2) }}</td>
                 <td class="text-end text-muted">{{ fx(r.turnover_med) }}</td>
@@ -116,9 +109,8 @@
         <div class="text-muted small mt-2">
           口径：申万板块（L1/L2/L3，成分取自 index_member_all 当前成分）的收益为成分股等权/流通市值加权
           自建聚合；主题指数（23 个中证/国证预置清单）的涨幅直接取官方指数日线，成分=最新月末快照
-          （历史成分变动未回溯，属近似）。RS = 板块净值 / 全市场等权净值（全市场等权由申万二级家数加权合成），
-          RS 排名为 2016 年至今累计口径（长跑总分，滞后），「30日RS」只用最近 30 个交易日窗口
-          （短期轮动敏感，≤20 强势 / ≥90 弱势着色）；成交占比为板块成交额占全市场比，变化为 20 日差（pp）。
+          （历史成分变动未回溯，属近似）；涨幅按净值折算，全市场等权基准由申万二级家数加权合成。
+          成交占比为板块成交额占全市场比，变化为 20 日差（pp）。
         </div>
       </div></div>
 
@@ -139,11 +131,7 @@
           <div id="chart-nav" class="chart"></div>
         </div></div>
         <div class="row g-3">
-          <div class="col-12 col-lg-6"><div class="card"><div class="card-body">
-            <h6 class="card-title small text-muted mb-1">相对强弱 RS（行业等权 / 全市场等权 ×100，>100 强于大盘）</h6>
-            <div id="chart-rs" class="chart-sm"></div>
-          </div></div></div>
-          <div class="col-12 col-lg-6"><div class="card"><div class="card-body">
+          <div class="col-12"><div class="card"><div class="card-body">
             <h6 class="card-title small text-muted mb-1">成交占比 % 与上涨家数占比 %</h6>
             <div id="chart-share" class="chart-sm"></div>
           </div></div></div>
@@ -156,6 +144,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/industry.js?v=20260921-3"></script>
+  <script src="/static/js/industry.js?v=20260922-2"></script>
 </body>
 </html>

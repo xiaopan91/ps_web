@@ -73,23 +73,6 @@ def overview(type: str = Query(default="sw_l2")):
     mkt_r20 = ((mkt_cum.iloc[-1] / mkt_cum.iloc[-21] - 1) * 100
                if len(mkt_cum) > 20 else np.nan)
 
-    rs_now = cum.iloc[-1] / mkt_cum.iloc[-1]
-    rs_rank = rs_now.rank(ascending=False)
-    if len(cum) > 20:
-        rs_rank_ago = (cum.iloc[-21] / mkt_cum.iloc[-21]).rank(ascending=False)
-        rs_chg = rs_rank_ago - rs_rank
-    else:
-        rs_chg = pd.Series(np.nan, index=cum.columns)
-
-    # 30 日窗口 RS：只用最近 30 个交易日的相对表现
-    if len(cum) > 30:
-        rs30 = ((cum.iloc[-1] / cum.iloc[-31])
-                / (mkt_cum.iloc[-1] / mkt_cum.iloc[-31])) * 100
-        rs30_rank = rs30.rank(ascending=False)
-    else:
-        rs30 = pd.Series(np.nan, index=cum.columns)
-        rs30_rank = pd.Series(np.nan, index=cum.columns)
-
     latest = df[df["trade_date"] == dates[-1]].set_index("board_code")
     ago20 = (df[df["trade_date"] == dates[-21]].set_index("board_code")
              if len(dates) > 20 else latest)
@@ -103,10 +86,6 @@ def overview(type: str = Query(default="sw_l2")):
         "n_stocks": latest["n_stocks"].reindex(cum.columns).values,
         "r1": r1.values, "r5": r5.values, "r20": r20.values, "r60": r60.values,
         "up_ratio": up_ratio.reindex(cum.columns).values,
-        "rs_rank": rs_rank.values.astype(int),
-        "rs_chg": rs_chg.values,
-        "rs30": rs30.values,
-        "rs30_rank": rs30_rank.values.astype(int),
         "share": latest["amount_share"].reindex(cum.columns).values,
         "share_chg": share_chg.reindex(cum.columns).values,
         "turnover_med": latest["turnover_med"].reindex(cum.columns).values,
@@ -153,7 +132,6 @@ def detail(board_code: str, days: int = Query(default=250, ge=30, le=3000)):
     nav_eq = ((1 + df["ret_eq"].fillna(0) / 100).cumprod() * 100).to_numpy()
     nav_cap = ((1 + df["ret_cap"].fillna(0) / 100).cumprod() * 100).to_numpy()
     mkt_nav = (mkt / mkt.bfill().iloc[0] * 100).to_numpy()        # 归一到窗口首日=100
-    rs = nav_eq / mkt_nav * 100
     up_ratio = df["up_count"] / (df["up_count"] + df["down_count"]) * 100
 
     def col(s, d=2):
@@ -167,7 +145,6 @@ def detail(board_code: str, days: int = Query(default=250, ge=30, le=3000)):
         "nav_eq": col(nav_eq),        # theme=官方指数净值（期初=100）；申万=等权自建
         "nav_cap": col(nav_cap),      # 申万=加权自建；theme 同官方
         "mkt_nav": col(mkt_nav),
-        "rs": col(rs),
         "amount_share": col(df["amount_share"], 3),
         "up_ratio": col(up_ratio, 1),
         "turnover_med": col(df["turnover_med"]),

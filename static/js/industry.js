@@ -38,7 +38,6 @@ const app = createApp({
     async function loadOverview() {
       const seq = ++ovSeq;
       loading.value = true;
-      sel.value = null;   // 切类型后原选中板块可能不存在，先清空
       detail.value = null;
       try {
         const res = await fetch(`/api/industry/overview?type=${type.value}`);
@@ -46,6 +45,8 @@ const app = createApp({
         if (seq !== ovSeq) return;
         rows.value = data?.rows || [];
         summary.value = data?.summary || null;
+        // 类型切换后原选中板块可能不在新列表里，此时才清空
+        if (sel.value && !rows.value.some(r => r.industry === sel.value)) sel.value = null;
       } catch (e) { /* 静默 */ }
       finally { if (seq === ovSeq) loading.value = false; }
     }
@@ -123,20 +124,6 @@ const app = createApp({
         yAxis: { scale: true, splitNumber: 4 },
         dataZoom: [{ type: "inside" }, { type: "slider", height: 16, bottom: 6 }],
         series,
-      }, true);
-      chart("chart-rs").setOption({
-        animation: false,
-        tooltip: { trigger: "axis" },
-        grid: { left: 50, right: 15, top: 15, bottom: 40 },
-        xAxis: { type: "category", data: d.dates },
-        yAxis: { scale: true, splitNumber: 3 },
-        dataZoom: [{ type: "inside" }],
-        series: [
-          mk("RS", d.rs, "#0ea5e9"),
-          { name: "100基准", type: "line", data: d.dates.map(() => 100),
-            showSymbol: false, lineStyle: { width: 1, type: "dashed", color: "#94a3b8" },
-            itemStyle: { color: "#94a3b8" }, tooltip: { show: false } },
-        ],
       }, true);
       chart("chart-share").setOption({
         animation: false,

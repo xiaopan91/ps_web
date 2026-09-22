@@ -22,6 +22,22 @@ def _series(s: pd.Series, ndigits: int = 4) -> list:
     return [None if pd.isna(v) else round(float(v), ndigits) for v in s]
 
 
+@router.get("/dcf")
+def dcf(
+    code: str,
+    rf: float = Query(default=2.5, ge=0, le=10),
+    erp: float = Query(default=6.0, ge=1, le=15),
+    g1: float = Query(default=None, ge=-20, le=50),
+    g: float = Query(default=2.5, ge=0, le=5),
+    base_mode: str = Query(default="avg3", pattern=r"^(avg3|latest|manual)$"),
+    base_override: float = Query(default=None, gt=0),
+):
+    """DCF 估值（两阶段 FCFE 折现）。g1/基数缺省时由历史数据自动推断。"""
+    from app.dcf_engine import compute_dcf
+    return compute_dcf(code, rf=rf, erp=erp, g1=g1, g=g,
+                       base_mode=base_mode, base_override=base_override)
+
+
 @router.get("/search", response_model=list[SearchItem])
 def search(q: str = Query(min_length=1), db: Session = Depends(get_db)):
     """按名称/代码模糊搜索在市股票。"""

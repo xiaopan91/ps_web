@@ -229,6 +229,7 @@ const app = createApp({
     watch(anaOpen, open => {
       if (open && !anaLoaded.value) loadAnalysis();
       else if (open) nextTick(() => resizeAna());
+      if (open) loadDcf();
     });
 
     const stats = computed(() => metrics.value?.stats || null);
@@ -576,10 +577,62 @@ const app = createApp({
       }
     }
 
+    // ---- DCF 估值（两阶段 FCFE 折现） ----
+    const dcf = ref(null);
+    const dcfLoading = ref(false);
+    const dcfP = ref({ rf: 2.5, erp: 6, g1: null, g: 2.5, baseMode: "avg3", baseOverride: null });
+
+    async function loadDcf() {
+      dcfLoading.value = true;
+      try {
+        const p = new URLSearchParams({
+          code: code.value, rf: dcfP.value.rf, erp: dcfP.value.erp,
+          g: dcfP.value.g, base_mode: dcfP.value.baseMode,
+        });
+        if (dcfP.value.g1 != null && dcfP.value.g1 !== "") p.set("g1", dcfP.value.g1);
+        if (dcfP.value.baseMode === "manual" && dcfP.value.baseOverride) {
+          p.set("base_override", dcfP.value.baseOverride);
+        }
+        const res = await fetch(`/api/stock/dcf?${p}`);
+        if (res.ok) {
+          dcf.value = await res.json();
+          await nextTick();
+          renderDcfChart();
+        }
+      } catch (e) { /* 静默 */ }
+      finally { dcfLoading.value = false; }
+    }
+
+    function cellBg(cell) {
+      if (!cell || cell.prem == null) return {};
+      const a = Math.min(0.5, Math.abs(cell.prem) / 150 + 0.06);
+      return { background: cell.prem > 0 ? `rgba(239,68,68,${a})` : `rgba(34,197,94,${a})` };
+    }
+
+    function renderDcfChart() {
+      const d = dcf.value;
+      if (!d || !d.applicable || !d.annual || !d.annual.length) return;
+      anaChart("chart-dcf-fcfe").setOption({
+        animation: false,
+        tooltip: { trigger: "axis", valueFormatter: v => v + " 亿" },
+        grid: { left: 55, right: 15, top: 20, bottom: 30 },
+        xAxis: { type: "category", data: d.annual.map(a => a.year) },
+        yAxis: { splitNumber: 3, axisLabel: { formatter: v => v + "亿" } },
+        series: [{
+          name: "年报FCFE", type: "bar",
+          data: d.annual.map(a => ({
+            value: a.fcfe, itemStyle: { color: a.fcfe >= 0 ? "#3b82f6" : "#ef4444" },
+          })),
+          barMaxWidth: 26,
+        }],
+      }, true);
+    }
+
     watch([code, range, adjust], () => { syncUrl(); load(); });
     // 分析区随股票/区间联动刷新（adjust 不影响分析口径，不必重拉）
-    watch([code, range], () => {
+    watch([code, range], ([newCode], [oldCode]) => {
       if (anaOpen.value || anaLoaded.value) loadAnalysis();
+      if (newCode !== oldCode) loadDcf();   // DCF 与区间无关，仅换股时重算
     });
 
     onMounted(() => {
@@ -601,6 +654,7 @@ const app = createApp({
              ranges, adjusts, onInput, pick,
              anaOpen, anaLoading, anaError, stats, statCards, factor, funda,
              fundaTiles,
+             dcf, dcfLoading, dcfP, loadDcf, cellBg,
              favOpen, favData, favPopOpen, favGroups, favErr, newGroupName,
              starred, toggleFavPop, toggleGroup, createGroupAndJoin,
              renameGroup, removeGroup, pickFav };

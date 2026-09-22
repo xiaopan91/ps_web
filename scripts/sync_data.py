@@ -37,12 +37,12 @@ DAILY_COLS = ["ts_code", "trade_date", "open", "high", "low", "close",
               "pre_close", "change", "pct_chg", "vol", "amount"]
 ADJ_COLS = ["ts_code", "trade_date", "adj_factor"]
 BASIC_DAILY_COLS = ["ts_code", "trade_date", "turnover_rate", "turnover_rate_f",
-                    "volume_ratio", "pe", "pe_ttm", "circ_mv", "total_mv"]
+                    "volume_ratio", "pe", "pe_ttm", "circ_mv", "total_mv", "total_share"]
 MARGIN_COLS = ["trade_date", "exchange_id", "rzye", "rzmre", "rzche",
                "rqye", "rzrqye"]
 FINA_COLS = ["ts_code", "ann_date", "end_date", "update_flag", "eps", "bps",
              "roe", "grossprofit_margin", "netprofit_margin", "debt_to_assets",
-             "or_yoy", "netprofit_yoy"]
+             "or_yoy", "netprofit_yoy", "fcfe", "fcff", "ebit", "working_capital"]
 
 # 主题指数预置清单（中证/国证，2026-09 逐个验证过日线+成分可得性）
 THEME_INDICES = [

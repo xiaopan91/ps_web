@@ -30,12 +30,19 @@
       <div class="container-fluid d-flex align-items-center">
         <div class="d-flex align-items-center gap-3">
           <a class="navbar-brand mb-0 h1" href="/">首页</a>
-          <a class="app-nav" href="/stock">个股行情</a>
-          <a class="app-nav" href="/index">指数行情</a>
-          <a class="app-nav" href="/industry">行业观察</a>
-          <a class="app-nav" href="/stockpredict">个股预测</a>
-          <a class="app-nav active" href="/predict">宏观预测</a>
-          <a class="app-nav" href="/strategy">买卖策略</a>
+          <div class="dropdown">
+            <a class="app-nav dropdown-toggle active" href="#" role="button"
+               data-bs-toggle="dropdown" aria-expanded="false">市场分析</a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="/stock">个股行情</a></li>
+              <li><a class="dropdown-item" href="/index">指数行情</a></li>
+              <li><a class="dropdown-item" href="/industry">行业观察</a></li>
+              <li><a class="dropdown-item" href="/stockpredict">个股预测</a></li>
+              <li><a class="dropdown-item" href="/predict">宏观预测</a></li>
+              <li><a class="dropdown-item" href="/strategy">买卖策略</a></li>
+            </ul>
+          </div>
+          <a class="app-nav" href="/finance">个人理财</a>
         </div>
         <a class="app-nav ms-auto" href="/tasks">任务中心</a>
       </div>

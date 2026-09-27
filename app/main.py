@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import fav, health, index_quotes, industry, pvfactor, sentiment, stock, strategy, tasks
+from app.routers import fav, finance, health, index_quotes, industry, pvfactor, sentiment, stock, strategy, tasks
 from app.task_runner import cleanup_orphans, scheduler_loop
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -37,6 +37,7 @@ app.include_router(tasks.router)
 app.include_router(pvfactor.router)
 app.include_router(fav.router)
 app.include_router(industry.router)
+app.include_router(finance.router)
 
 # 静态资源：/static/css/... /static/js/... /static/vendor/...
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -114,6 +115,18 @@ def industry_page():
 def board_detail_page():
     """板块详情页（趋势 + 成分股）。"""
     return FileResponse(TEMPLATES_DIR / "board_detail.html")
+
+
+@app.get("/finance", include_in_schema=False)
+def finance_page():
+    """个人理财容器页。"""
+    return FileResponse(TEMPLATES_DIR / "finance.html")
+
+
+@app.get("/finance/snapshots", include_in_schema=False)
+def finance_snapshots_page():
+    """资产快照录入与回顾。"""
+    return FileResponse(TEMPLATES_DIR / "finance_snapshots.html")
 
 
 @app.get("/strategy", include_in_schema=False)

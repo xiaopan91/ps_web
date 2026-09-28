@@ -121,7 +121,16 @@
                 <td>{{ i.name }}</td>
                 <td class="text-muted">{{ i.asset_type }}</td>
                 <td class="text-muted">{{ i.ts_code || '—' }}</td>
-                <td class="text-end">{{ fmtYuan(i.amount) }}</td>
+                <td class="text-end" @dblclick="startBalEdit(i)" title="双击修改余额（确认后直接录入，单位：元）">
+                  <template v-if="balEditId === i.id">
+                    <input type="number" step="0.01" class="form-control form-control-sm text-end d-inline-block"
+                           style="width:120px" v-model.number="balEditVal"
+                           @keyup.enter="confirmBalEdit" @keyup.esc="cancelBalEdit" ref="balInput">
+                    <button class="btn btn-sm btn-link text-primary p-0" @click="confirmBalEdit" title="确认录入">✓</button>
+                    <button class="btn btn-sm btn-link text-muted p-0" @click="cancelBalEdit" title="取消">✕</button>
+                  </template>
+                  <template v-else>{{ fmtYuan(i.amount) }}</template>
+                </td>
                 <td class="text-muted">{{ i.balance_date || '—' }}</td>
                 <td class="text-end">
                   <template v-if="i.quote_close != null">
@@ -234,6 +243,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/finance_sub.js?v=20260928-17"></script>
+  <script src="/static/js/finance_sub.js?v=20260928-18"></script>
 </body>
 </html>

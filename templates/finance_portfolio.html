@@ -109,7 +109,18 @@
                   <td><span class="badge text-bg-light module-chip">{{ s.module }}</span></td>
                   <td><strong>{{ s.sub }}</strong></td>
                   <td class="text-muted">{{ s.count }}</td>
-                  <td class="text-end">{{ fmtYuan(s.balance) }}</td>
+                  <td class="text-end" @dblclick="startBalanceEdit(s)" title="双击修改余额（确认后直接录入，单位：元）">
+                    <template v-if="editingSub === s.sub">
+                      <input type="number" step="0.01" class="form-control form-control-sm text-end d-inline-block"
+                             style="width:120px" v-model.number="editVal"
+                             @keyup.enter="confirmBalanceEdit" @keyup.esc="cancelBalanceEdit" ref="balInput">
+                      <button class="btn btn-sm btn-link text-primary p-0" @click="confirmBalanceEdit"
+                              title="确认录入">✓</button>
+                      <button class="btn btn-sm btn-link text-muted p-0" @click="cancelBalanceEdit"
+                              title="取消">✕</button>
+                    </template>
+                    <template v-else>{{ fmtYuan(s.balance) }}</template>
+                  </td>
                   <td class="text-end">
                     <input type="number" step="0.5" min="0" max="100"
                            class="form-control form-control-sm text-end" style="width:90px"
@@ -274,6 +285,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/finance_portfolio.js?v=20260928-18"></script>
+  <script src="/static/js/finance_portfolio.js?v=20260928-19"></script>
 </body>
 </html>

@@ -14,6 +14,8 @@ document.addEventListener("DOMContentLoaded", function () {
         balForm: { item_id: null, date: "", amount: null, note: "" },
         trForm: { date: "", from_item: null, to_item: null, amount: null, note: "" },
         histSub: "",
+        editingSub: "",   // 双击改余额：当前编辑的小模块
+        editVal: null,    // 双击改余额：输入的金额（元）
         charts: {},
         loading: false,
         errMsg: "",
@@ -67,6 +69,38 @@ document.addEventListener("DOMContentLoaded", function () {
       diffCls(sub) {
         const d = this.diff(sub);
         return d > 0.005 ? "up" : (d < -0.005 ? "down" : "text-muted");
+      },
+
+      itemsOf(sub) { return (this.pf.items || []).filter(i => i.sub === sub); },
+
+      // 双击当前余额 → 行内编辑 → 确认后直接录入一条余额（当日）
+      startBalanceEdit(s) {
+        const its = this.itemsOf(s.sub);
+        if (!its.length) { this.errMsg = "该小模块暂无标的，请先到详情页添加"; return; }
+        if (its.length > 1) { this.errMsg = "该小模块有多个标的，请到「详情」页分别录入"; return; }
+        this.editingSub = s.sub;
+        this.editVal = its[0].amount;
+        this.$nextTick(() => {
+          const ref = this.$refs.balInput;
+          const el = Array.isArray(ref) ? ref[0] : ref;
+          if (el) { el.focus(); el.select && el.select(); }
+        });
+      },
+      cancelBalanceEdit() { this.editingSub = ""; this.editVal = null; },
+      async confirmBalanceEdit() {
+        const its = this.itemsOf(this.editingSub);
+        if (!its.length) { this.cancelBalanceEdit(); return; }
+        if (this.editVal == null || isNaN(this.editVal)) { this.errMsg = "请输入有效金额（元）"; return; }
+        try {
+          const r = await fetch("/api/fin/balances", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ item_id: its[0].id, date: this.today(),
+                                   amount: +this.editVal, note: "双击快速录入" }),
+          });
+          if (!r.ok) throw new Error(await r.text());
+          this.cancelBalanceEdit();
+          await this.loadAll();
+        } catch (e) { this.errMsg = "录入余额失败：" + e.message; }
       },
 
       // 统一取数：非 2xx 或网络抖动重试一次，仍失败则抛错（不静默降级成空对象）

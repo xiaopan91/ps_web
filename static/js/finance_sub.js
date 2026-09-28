@@ -14,6 +14,8 @@ document.addEventListener("DOMContentLoaded", function () {
         dirty: false,
         itemForm: { name: "", query: "", asset_type: "其他", ts_code: "" },
         searchResults: [],
+        balEditId: null,   // 双击改余额：当前编辑的标的
+        balEditVal: null,  // 双击改余额：输入的金额（元）
         charts: {},
         errMsg: "",
         infoErr: "",
@@ -42,6 +44,12 @@ document.addEventListener("DOMContentLoaded", function () {
         return (v > 0 ? "+" : "") + v + (suffix || "");
       },
       irrCls(v) { return v == null ? "text-muted" : (v >= 0 ? "irr-pos" : "irr-neg"); },
+
+      today() {
+        const d = new Date();
+        const p = n => String(n).padStart(2, "0");
+        return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+      },
 
       async getJSON(url) {
         let lastErr = null;
@@ -120,6 +128,31 @@ document.addEventListener("DOMContentLoaded", function () {
           if (!r.ok) throw new Error(await r.text());
           await this.loadInfo();
         } catch (e) { this.errMsg = "删除标的失败：" + e.message; }
+      },
+
+      // 双击余额 → 行内编辑 → 确认后直接录入一条余额（当日）
+      startBalEdit(it) {
+        this.balEditId = it.id;
+        this.balEditVal = it.amount;
+        this.$nextTick(() => {
+          const ref = this.$refs.balInput;
+          const el = Array.isArray(ref) ? ref[ref.length - 1] : ref;
+          if (el) { el.focus(); el.select && el.select(); }
+        });
+      },
+      cancelBalEdit() { this.balEditId = null; this.balEditVal = null; },
+      async confirmBalEdit() {
+        if (this.balEditVal == null || isNaN(this.balEditVal)) { this.errMsg = "请输入有效金额（元）"; return; }
+        try {
+          const r = await fetch("/api/fin/balances", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ item_id: this.balEditId, date: this.today(),
+                                   amount: +this.balEditVal, note: "双击快速录入" }),
+          });
+          if (!r.ok) throw new Error(await r.text());
+          this.cancelBalEdit();
+          await this.loadInfo();
+        } catch (e) { this.errMsg = "录入余额失败：" + e.message; }
       },
 
       // ------------------------------------------------ 笔记

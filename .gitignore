@@ -15,7 +15,6 @@ __pycache__/
 logs/
 
 # 本地工具与运行时产物（nssm.exe 重新部署时从 nssm.cc 下载）
-tools/
 
 # 编辑器
 .vscode/

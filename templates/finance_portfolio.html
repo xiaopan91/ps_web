@@ -98,7 +98,8 @@
                 <th>大模块</th><th>小模块</th><th>标的数</th>
                 <th class="text-end">当前余额</th>
                 <th class="text-end" style="width:130px">目标%
-                  <button class="btn btn-sm btn-link text-primary p-0" @click="saveTargets">保存</button></th>
+                  <button class="btn btn-sm btn-link text-primary p-0" @click="saveTargets"
+                          title="保存目标配置"><i class="bi bi-save"></i></button></th>
                 <th class="text-end">目标金额</th>
                 <th class="text-end">调仓差额</th>
                 <th></th>
@@ -133,7 +134,7 @@
                   </td>
                   <td class="text-end">
                     <a class="btn btn-sm btn-link text-primary p-0"
-                       :href="'/finance/sub?sub=' + encodeURIComponent(s.sub)">详情</a>
+                       :href="'/finance/sub?sub=' + encodeURIComponent(s.sub)" title="查看详情"><i class="bi bi-eye"></i></a>
                   </td>
                 </tr>
               </template>
@@ -150,8 +151,8 @@
       <!-- 录入与管理 -->
       <div class="card mb-3"><div class="card-body">
         <ul class="nav nav-pills mb-3">
-          <li class="nav-item"><a class="nav-link" href="#" :class="{active: formTab==='balance'}" @click.prevent="formTab='balance'">录余额</a></li>
-          <li class="nav-item"><a class="nav-link" href="#" :class="{active: formTab==='transfer'}" @click.prevent="formTab='transfer'">录移仓</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" :class="{active: formTab==='balance'}" @click.prevent="formTab='balance'"><i class="bi bi-cash-coin me-1"></i>录余额</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" :class="{active: formTab==='transfer'}" @click.prevent="formTab='transfer'"><i class="bi bi-arrow-left-right me-1"></i>录移仓</a></li>
         </ul>
 
         <!-- 余额录入 -->

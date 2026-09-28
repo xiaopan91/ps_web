@@ -173,7 +173,7 @@
             <input class="form-control form-control-sm" v-model="itemForm.name">
           </div>
           <div class="col-6 col-lg-2">
-            <button class="btn btn-sm btn-primary w-100" @click="addItem">添加标的</button>
+            <button class="btn btn-sm btn-primary w-100" @click="addItem" title="添加标的"><i class="bi bi-plus-lg"></i></button>
           </div>
           <div class="col-12">
             <span class="text-muted small" v-if="itemForm.ts_code">已关联行情：{{ itemForm.ts_code }}（{{ itemForm.asset_type }}）</span>
@@ -192,7 +192,7 @@
       <div class="card mb-3"><div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h6 class="card-title mb-0">笔记 <span class="text-muted small fw-normal">想法与记录（支持超文本）</span></h6>
-          <button class="btn btn-sm btn-outline-primary" @click="newNote">新建笔记</button>
+          <button class="btn btn-sm btn-outline-primary" @click="newNote" title="新建笔记"><i class="bi bi-plus-lg"></i></button>
         </div>
         <div class="row g-3">
           <div class="col-12 col-lg-4">
@@ -212,8 +212,8 @@
           <div class="col-12 col-lg-8">
             <div class="d-flex gap-2 mb-2">
               <input class="form-control form-control-sm" v-model="curTitle" placeholder="笔记标题">
-              <button class="btn btn-sm btn-primary text-nowrap" @click="saveNote"
-                      :disabled="!curId">{{ dirty ? '保存' : '已保存' }}</button>
+              <button class="btn btn-sm btn-primary text-nowrap" @click="saveNote" :disabled="!curId">
+              <i class="bi" :class="dirty ? 'bi-save' : 'bi-check2'"></i> {{ dirty ? '保存' : '已保存' }}</button>
             </div>
             <div class="btn-group btn-group-sm editor-toolbar w-100 border border-bottom-0 bg-light" v-if="curId">
               <button class="btn btn-outline-secondary" @click="exec('bold')" title="加粗"><b>B</b></button>

@@ -122,8 +122,8 @@
                   </template>
                   <td class="text-nowrap">
                     <template v-if="editing && editing.id === s.id">
-                      <a href="#" class="text-primary small me-2" @click.prevent="saveEdit">保存</a>
-                      <a href="#" class="text-muted small" @click.prevent="editing = null">取消</a>
+                      <a href="#" class="text-primary small me-2" @click.prevent="saveEdit" title="保存"><i class="bi bi-check-lg"></i></a>
+                      <a href="#" class="text-muted small" @click.prevent="editing = null" title="取消"><i class="bi bi-x-lg"></i></a>
                     </template>
                     <template v-else>
                       <div class="form-check form-switch d-inline-block me-2">
@@ -151,7 +151,7 @@
                   <span class="small">{{ '一二三四五六日'[w-1] }}</span>
                 </label>
               </div>
-              <button class="btn btn-outline-primary btn-sm" type="submit">添加</button>
+              <button class="btn btn-outline-primary btn-sm" type="submit" title="添加任务"><i class="bi bi-plus-lg"></i></button>
             </form>
           </div></div>
         </div>
@@ -172,7 +172,7 @@
                 <td>{{ r.trigger === 'schedule' ? '定时' : '手动' }}</td>
                 <td><span class="badge" :class="'badge-' + r.status">{{ statusText(r.status) }}</span></td>
                 <td>{{ r.duration_s != null ? fmtDur(r.duration_s) : '—' }}</td>
-                <td><a href="#" class="small" @click.prevent="showLog(r)">日志</a></td>
+                <td><a href="#" class="small" @click.prevent="showLog(r)" title="运行日志"><i class="bi bi-terminal"></i></a></td>
               </tr>
             </tbody>
           </table>

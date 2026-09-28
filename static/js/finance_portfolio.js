@@ -1,8 +1,6 @@
 // 资产总览与调仓（/finance/portfolio）：标的级持仓 + 目标配置 + 余额/移仓 + 余额法 XIRR
 // Options API：与 finance_portfolio.html 内联模板逐名对齐（pf / editTargets / balForm / trForm / itemForm ...）
 document.addEventListener("DOMContentLoaded", function () {
-  const MODULES = ["低风险", "中风险", "高风险"];
-  const PRESET_SUBS = ["存款", "债基", "红利etf", "宽基etf", "海外etf", "个股", "行业etf"];
 
   window.fpApp = Vue.createApp({
     data() {
@@ -16,7 +14,7 @@ document.addEventListener("DOMContentLoaded", function () {
         formTab: "balance",
         balForm: { item_id: null, date: "", amount: null, note: "" },
         trForm: { date: "", from_item: null, to_item: null, amount: null, note: "" },
-        itemForm: { module: "中风险", sub: "", name: "", query: "", asset_type: "其他", ts_code: "" },
+        itemForm: { name: "", query: "", asset_type: "其他", ts_code: "" },
         searchResults: [],
         histSub: "",
         charts: {},
@@ -27,8 +25,6 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     computed: {
-      modules: () => MODULES,
-      presetSubs: () => PRESET_SUBS,
       itemsFlat() { return this.pf.items || []; },
       targetsSum() {
         const vals = Object.values(this.editTargets).map(v => +v || 0);
@@ -191,20 +187,22 @@ document.addEventListener("DOMContentLoaded", function () {
         this.itemForm.query = "";
         this.searchResults = [];
       },
-      async addItem() {
+      async addItem(s) {
         const f = this.itemForm;
-        if (!f.module || !f.sub.trim() || !f.name.trim()) { this.errMsg = "添加标的：大模块/小模块/名称必填"; return; }
+        if (!s || !s.sub) { this.errMsg = "添加标的：缺少小模块"; return; }
+        if (!f.name.trim()) { this.errMsg = "添加标的：请填写标的名称（或先选择关联行情）"; return; }
         try {
           const r = await fetch("/api/fin/items", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              module: f.module, sub: f.sub.trim(), name: f.name.trim(),
+              module: s.module, sub: s.sub, name: f.name.trim(),
               asset_type: f.ts_code ? f.asset_type : "其他",
               ts_code: f.ts_code || null, note: "",
             }),
           });
           if (!r.ok) throw new Error(await r.text());
-          this.itemForm = { module: f.module, sub: f.sub, name: "", query: "", asset_type: "其他", ts_code: "" };
+          this.itemForm = { name: "", query: "", asset_type: "其他", ts_code: "" };
+          this.expandedSub = s.sub;   // 保持展开，直接看到新标的
           await this.loadAll();
         } catch (e) { this.errMsg = "添加标的失败：" + e.message; }
       },

@@ -154,12 +154,37 @@
                         </tr>
                       </tbody>
                     </table>
+                    <div class="row g-2 align-items-end mt-1">
+                      <div class="col-7 col-lg-4 search-box">
+                        <label class="form-label small text-muted mb-0">关联行情（可选，关键字搜索）</label>
+                        <input class="form-control form-control-sm" v-model="itemForm.query"
+                               placeholder="如 沪深300 / 贵州茅台 / 510300" @input="searchAsset">
+                        <ul class="search-list" v-if="searchResults.length">
+                          <li class="item" v-for="a in searchResults" :key="a.asset_type + a.ts_code"
+                              @click="pickAsset(a)">
+                            <span class="badge text-bg-light me-1" style="font-size:.68rem">{{ a.asset_type }}</span>
+                            {{ a.name }} <span class="text-muted">{{ a.ts_code }}</span>
+                          </li>
+                        </ul>
+                      </div>
+                      <div class="col-5 col-lg-3">
+                        <label class="form-label small text-muted mb-0">标的名称</label>
+                        <input class="form-control form-control-sm" v-model="itemForm.name">
+                      </div>
+                      <div class="col-6 col-lg-2">
+                        <button class="btn btn-sm btn-primary w-100" @click="addItem(s)">添加标的</button>
+                      </div>
+                      <div class="col-12">
+                        <span class="text-muted small" v-if="itemForm.ts_code">已关联行情：{{ itemForm.ts_code }}（{{ itemForm.asset_type }}）</span>
+                        <span class="text-muted small" v-else-if="itemForm.name">未关联行情（将作为纯手动标的，如存款）</span>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               </template>
               <tr v-if="!(pf.subs || []).length">
                 <td colspan="8" class="text-muted small text-center py-3">
-                  还没有标的：在下方「添加标的」建立第一个持仓
+                  暂无小模块
                 </td>
               </tr>
             </tbody>
@@ -172,7 +197,6 @@
         <ul class="nav nav-pills mb-3">
           <li class="nav-item"><a class="nav-link" href="#" :class="{active: formTab==='balance'}" @click.prevent="formTab='balance'">录余额</a></li>
           <li class="nav-item"><a class="nav-link" href="#" :class="{active: formTab==='transfer'}" @click.prevent="formTab='transfer'">录移仓</a></li>
-          <li class="nav-item"><a class="nav-link" href="#" :class="{active: formTab==='item'}" @click.prevent="formTab='item'">添加标的</a></li>
         </ul>
 
         <!-- 余额录入 -->
@@ -227,46 +251,6 @@
           <div class="col-6 col-lg-2">
             <button class="btn btn-sm btn-primary w-100" @click="submitTransfer">移仓</button>
           </div>
-        </div>
-
-        <!-- 添加标的 -->
-        <div v-if="formTab==='item'">
-          <div class="row g-2 align-items-end mb-2">
-            <div class="col-6 col-lg-2">
-              <label class="form-label small text-muted mb-0">大模块</label>
-              <select class="form-select form-select-sm" v-model="itemForm.module">
-                <option v-for="m in modules" :key="m" :value="m">{{ m }}</option>
-              </select>
-            </div>
-            <div class="col-6 col-lg-2">
-              <label class="form-label small text-muted mb-0">小模块</label>
-              <input class="form-control form-control-sm" list="subList" v-model="itemForm.sub" placeholder="选或输入">
-              <datalist id="subList">
-                <option v-for="s in presetSubs" :key="s" :value="s">{{ s }}</option>
-              </datalist>
-            </div>
-            <div class="col-8 col-lg-4 search-box">
-              <label class="form-label small text-muted mb-0">关联行情（可选，输入关键字搜索）</label>
-              <input class="form-control form-control-sm" v-model="itemForm.query"
-                     placeholder="如 沪深300 / 贵州茅台 / 510300" @input="searchAsset">
-              <ul class="search-list" v-if="searchResults.length">
-                <li class="item" v-for="a in searchResults" :key="a.asset_type + a.ts_code"
-                    @click="pickAsset(a)">
-                  <span class="badge text-bg-light me-1" style="font-size:.68rem">{{ a.asset_type }}</span>
-                  {{ a.name }} <span class="text-muted">{{ a.ts_code }}</span>
-                </li>
-              </ul>
-            </div>
-            <div class="col-6 col-lg-2">
-              <label class="form-label small text-muted mb-0">标的名称</label>
-              <input class="form-control form-control-sm" v-model="itemForm.name">
-            </div>
-            <div class="col-6 col-lg-2">
-              <button class="btn btn-sm btn-primary w-100" @click="addItem">添加标的</button>
-            </div>
-          </div>
-          <div class="text-muted small" v-if="itemForm.ts_code">已关联行情：{{ itemForm.ts_code }}（{{ itemForm.asset_type }}）</div>
-          <div class="text-danger small" v-if="itemForm.name && !itemForm.ts_code">未关联行情（将作为纯手动标的，如存款）</div>
         </div>
       </div></div>
 
@@ -347,6 +331,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/finance_portfolio.js?v=20260928-15"></script>
+  <script src="/static/js/finance_portfolio.js?v=20260928-16"></script>
 </body>
 </html>

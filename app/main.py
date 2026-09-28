@@ -43,6 +43,17 @@ app.include_router(finance.router)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+@app.middleware("http")
+async def cache_control_header(request, call_next):
+    """HTML 页面禁缓存；静态资源强制协商缓存（文件变更立即生效）。"""
+    response = await call_next(request)
+    if request.url.path.startswith("/static"):
+        response.headers["Cache-Control"] = "no-cache"
+    else:
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.get("/", include_in_schema=False)
 def index():
     """首页：返回 Vue 单页（免编译，直接由后端托管）。"""
@@ -123,10 +134,10 @@ def finance_page():
     return FileResponse(TEMPLATES_DIR / "finance.html")
 
 
-@app.get("/finance/snapshots", include_in_schema=False)
-def finance_snapshots_page():
-    """资产快照录入与回顾。"""
-    return FileResponse(TEMPLATES_DIR / "finance_snapshots.html")
+@app.get("/finance/portfolio", include_in_schema=False)
+def finance_portfolio_page():
+    """资产总览与调仓（标的级持仓体系）。"""
+    return FileResponse(TEMPLATES_DIR / "finance_portfolio.html")
 
 
 @app.get("/strategy", include_in_schema=False)

@@ -20,3 +20,5 @@ tools/
 # 编辑器
 .vscode/
 .idea/
+.zcode/
+*.bak

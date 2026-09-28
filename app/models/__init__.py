@@ -1,7 +1,8 @@
 # ORM 模型汇总导出（Base.metadata.create_all 依赖这里的导入）
 from app.models.adj_factor import AdjFactor
 from app.models.board import BoardDaily, BoardGroup, BoardMember
-from app.models.finance import FinSnapshot
+from app.models.finance import (FinBalance, FinItem, FinSnapshot,
+                                 FinTarget, FinTransfer)
 from app.models.daily_bar import DailyBar
 from app.models.daily_basic import DailyBasic
 from app.models.fina_indicator import FinaIndicator
@@ -22,4 +23,5 @@ __all__ = ["TradeCal", "DailyBar", "AdjFactor", "StockBasic", "IndexDaily",
            "DailyBasic", "MarginDaily", "HsgtFlow", "MarketSentiment",
            "FundDaily", "FundBasic", "TaskRun", "TaskSchedule", "PvRank",
            "FinaIndicator", "StockGroup", "StockGroupMember", "IndustryDaily",
-           "BoardGroup", "BoardMember", "BoardDaily", "FinSnapshot"]
+           "BoardGroup", "BoardMember", "BoardDaily", "FinSnapshot",
+           "FinItem", "FinBalance", "FinTransfer", "FinTarget"]

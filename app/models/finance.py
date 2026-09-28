@@ -17,7 +17,7 @@ from app.database import Base
 
 MODULES = ["低风险", "中风险", "高风险"]
 PRESET_SUBS = {
-    "低风险": ["存款", "债基"],
+    "低风险": ["存款", "活期", "债基"],
     "中风险": ["红利etf", "宽基etf", "海外etf"],
     "高风险": ["个股", "行业etf"],
 }

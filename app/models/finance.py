@@ -21,6 +21,8 @@ PRESET_SUBS = {
     "中风险": ["红利etf", "宽基etf", "海外etf"],
     "高风险": ["个股", "行业etf"],
 }
+# 小模块 → 大模块（预置）；总览聚合时无标的的预置小模块也按此归属展示
+PRESET_SUB_MODULE = {sub: m for m, subs in PRESET_SUBS.items() for sub in subs}
 ASSET_TYPES = ["股票", "ETF", "指数", "其他"]
 
 

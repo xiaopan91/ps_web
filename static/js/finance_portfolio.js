@@ -83,18 +83,34 @@ document.addEventListener("DOMContentLoaded", function () {
         return v == null ? "—" : this.fx(v, "%");
       },
 
+      // 统一取数：非 2xx 或网络抖动重试一次，仍失败则抛错（不静默降级成空对象）
+      async getJSON(url) {
+        let lastErr = null;
+        for (let i = 0; i < 2; i++) {
+          try {
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(url + " HTTP " + r.status);
+            return await r.json();
+          } catch (e) {
+            lastErr = e;
+            await new Promise(res => setTimeout(res, 400));
+          }
+        }
+        throw lastErr || new Error(url + " 请求失败");
+      },
+
       async loadAll() {
         this.loading = true;
         this.errMsg = "";
         try {
-          const [pf, targets, hist, irr] = await Promise.all([
-            fetch("/api/fin/portfolio").then(r => r.ok ? r.json() : Promise.reject(new Error("portfolio " + r.status))),
-            fetch("/api/fin/targets").then(r => r.ok ? r.json() : {}),
-            fetch("/api/fin/history?limit=2000").then(r => r.ok ? r.json() : { balances: [], transfers: [] }),
-            fetch("/api/fin/irr").then(r => r.ok ? r.json() : { items: [], subs: [], modules: [] }),
-          ]);
+          const pf = await this.getJSON("/api/fin/portfolio");
+          const targets = await this.getJSON("/api/fin/targets");
+          const hist = await this.getJSON("/api/fin/history?limit=2000");
+          const irr = await this.getJSON("/api/fin/irr");
           this.pf = pf;
-          this.editTargets = Object.assign({}, targets);
+          if (targets && typeof targets === "object" && !Array.isArray(targets)) {
+            this.editTargets = Object.assign({}, targets);
+          }
           this.hist = hist;
           this.irr = irr;
           const map = {};

@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from app.database import engine
-from app.models.finance import MODULES, PRESET_SUBS
+from app.models.finance import MODULES, PRESET_SUB_MODULE
 from app.pa_engine import xirr
 from app.routers.index_quotes import INDEX_NAMES
 from scripts.sync_data import THEME_INDICES
@@ -278,24 +278,29 @@ def portfolio():
                                        "balance": 0.0, "count": 0})
         s["balance"] += i["amount"] or 0
         s["count"] += 1
+    # 无标的的小模块也展示（预置 + 已设目标），便于先定目标配置、后建仓
+    for sub in (set(PRESET_SUB_MODULE) | set(targets)) - set(subs):
+        subs[sub] = {"module": PRESET_SUB_MODULE.get(sub, "其他"), "sub": sub,
+                     "balance": 0.0, "count": 0}
     for s in subs.values():
         t = targets.get(s["sub"], 0.0)
         s["target_pct"] = t
         s["target_amt"] = round(total * t / 100, 2)
         s["diff"] = round(s["target_amt"] - s["balance"], 2)
-    sub_rows = sorted(subs.values(), key=lambda x: (-x["balance"]))
+    # 大模块顺序（低→中→高）优先，同模块内余额降序
+    _order = {m: i for i, m in enumerate(MODULES)}
+    sub_rows = sorted(subs.values(),
+                      key=lambda x: (_order.get(x["module"], 99), -x["balance"]))
 
     modules = {}
     for s in sub_rows:
         m = modules.setdefault(s["module"], {"module": s["module"], "balance": 0.0})
         m["balance"] += s["balance"]
 
-    preset_missing = [m for m in PRESET_SUBS if m not in modules]
-
     return {"total": round(total, 2), "items": items, "subs": sub_rows,
-            "modules": [modules[m] for m in sorted(modules)],
-            "targets_sum": round(sum(targets.values()), 2),
-            "preset_missing": preset_missing}
+            "modules": [modules[m] for m in MODULES if m in modules]
+                       + [modules[m] for m in sorted(modules) if m not in MODULES],
+            "targets_sum": round(sum(targets.values()), 2)}
 
 
 # --------------------------------------------------------------- 历史与 IRR

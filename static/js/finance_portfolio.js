@@ -1,5 +1,6 @@
 // 资产总览与调仓（/finance/portfolio）：标的级持仓 + 目标配置 + 余额/移仓 + 余额法 XIRR
-// Options API：与 finance_portfolio.html 内联模板逐名对齐（pf / editTargets / balForm / trForm / itemForm ...）
+// Options API：与 finance_portfolio.html 内联模板逐名对齐。
+// 小模块的标的明细、添加标的、笔记在 /finance/sub?sub=... 详情页。
 document.addEventListener("DOMContentLoaded", function () {
 
   window.fpApp = Vue.createApp({
@@ -9,18 +10,13 @@ document.addEventListener("DOMContentLoaded", function () {
         editTargets: {},
         irr: { items: [], subs: [], modules: [] },
         hist: { balances: [], transfers: [] },
-        irrByItem: {},
-        expandedSub: "",
         formTab: "balance",
         balForm: { item_id: null, date: "", amount: null, note: "" },
         trForm: { date: "", from_item: null, to_item: null, amount: null, note: "" },
-        itemForm: { name: "", query: "", asset_type: "其他", ts_code: "" },
-        searchResults: [],
         histSub: "",
         charts: {},
         loading: false,
         errMsg: "",
-        _searchTimer: null,
       };
     },
 
@@ -72,12 +68,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const d = this.diff(sub);
         return d > 0.005 ? "up" : (d < -0.005 ? "down" : "text-muted");
       },
-      subItems(sub) { return (this.pf.items || []).filter(i => i.sub === sub); },
-      expandSub(sub) { this.expandedSub = this.expandedSub === sub ? "" : sub; },
-      itemIrr(id) {
-        const v = this.irrByItem[id];
-        return v == null ? "—" : this.fx(v, "%");
-      },
 
       // 统一取数：非 2xx 或网络抖动重试一次，仍失败则抛错（不静默降级成空对象）
       async getJSON(url) {
@@ -109,9 +99,6 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           this.hist = hist;
           this.irr = irr;
-          const map = {};
-          (irr.items || []).forEach(it => { map[it.item_id] = it.xirr; });
-          this.irrByItem = map;
           if (!this.balForm.date) this.balForm.date = this.today();
           if (!this.trForm.date) this.trForm.date = this.today();
           if (!this.balForm.item_id && this.itemsFlat.length) this.balForm.item_id = this.itemsFlat[0].id;
@@ -169,44 +156,6 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) { this.errMsg = "移仓失败：" + e.message; }
       },
 
-      searchAsset() {
-        clearTimeout(this._searchTimer);
-        const q = (this.itemForm.query || "").trim();
-        if (!q) { this.searchResults = []; return; }
-        this._searchTimer = setTimeout(async () => {
-          try {
-            const r = await fetch("/api/fin/search_asset?q=" + encodeURIComponent(q));
-            this.searchResults = r.ok ? await r.json() : [];
-          } catch (e) { this.searchResults = []; }
-        }, 250);
-      },
-      pickAsset(a) {
-        this.itemForm.ts_code = a.ts_code;
-        this.itemForm.asset_type = a.asset_type;
-        this.itemForm.name = a.name;
-        this.itemForm.query = "";
-        this.searchResults = [];
-      },
-      async addItem(s) {
-        const f = this.itemForm;
-        if (!s || !s.sub) { this.errMsg = "添加标的：缺少小模块"; return; }
-        if (!f.name.trim()) { this.errMsg = "添加标的：请填写标的名称（或先选择关联行情）"; return; }
-        try {
-          const r = await fetch("/api/fin/items", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              module: s.module, sub: s.sub, name: f.name.trim(),
-              asset_type: f.ts_code ? f.asset_type : "其他",
-              ts_code: f.ts_code || null, note: "",
-            }),
-          });
-          if (!r.ok) throw new Error(await r.text());
-          this.itemForm = { name: "", query: "", asset_type: "其他", ts_code: "" };
-          this.expandedSub = s.sub;   // 保持展开，直接看到新标的
-          await this.loadAll();
-        } catch (e) { this.errMsg = "添加标的失败：" + e.message; }
-      },
-
       async delBalance(e) {
         if (!confirm("删除该余额记录 " + e.date + " " + e.name + "？")) return;
         try {
@@ -214,15 +163,6 @@ document.addEventListener("DOMContentLoaded", function () {
           if (!r.ok) throw new Error(await r.text());
           await this.loadAll();
         } catch (er) { this.errMsg = "删除失败：" + er.message; }
-      },
-
-      async delItem(it) {
-        if (!confirm("删除标的「" + it.name + "」？\n其余额记录与移仓记录将一并删除，不可恢复。")) return;
-        try {
-          const r = await fetch("/api/fin/items/" + it.id, { method: "DELETE" });
-          if (!r.ok) throw new Error(await r.text());
-          await this.loadAll();
-        } catch (er) { this.errMsg = "删除标的失败：" + er.message; }
       },
 
       initChart(id) {

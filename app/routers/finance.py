@@ -303,6 +303,39 @@ def portfolio():
             "targets_sum": round(sum(targets.values()), 2)}
 
 
+# --------------------------------------------------------------- 小模块详情
+
+@router.get("/sub/{sub_name}")
+def sub_detail(sub_name: str):
+    """小模块详情页数据：概览 + 标的（含行情与 XIRR）+ 余额历史。"""
+    all_items = _items_full()
+    items = [i for i in all_items if i["sub"] == sub_name]
+    targets = list_targets()
+    module = items[0]["module"] if items else PRESET_SUB_MODULE.get(sub_name)
+    if module is None and sub_name not in targets:
+        raise HTTPException(404, f"未知小模块: {sub_name}")
+
+    total = sum(i["amount"] or 0 for i in all_items)
+    balance = sum(i["amount"] or 0 for i in items)
+    t = targets.get(sub_name, 0.0)
+    xirr_map = {x["item_id"]: x["xirr"] for x in irr()["items"]}
+    for i in items:
+        i["xirr"] = xirr_map.get(i["id"])
+
+    hist = pd.read_sql(text(
+        "SELECT b.item_id, i.name, b.date, b.amount FROM fin_balance b "
+        "JOIN fin_item i ON i.id = b.item_id WHERE i.sub = :s "
+        "ORDER BY b.date, b.id LIMIT 2000"), engine, params={"s": sub_name})
+    history = [{"item_id": int(r.item_id), "name": r.name, "date": str(r.date),
+                "amount": _clean(r.amount)} for r in hist.itertuples()]
+
+    return {"module": module or "其他", "sub": sub_name,
+            "balance": round(balance, 2), "count": len(items),
+            "target_pct": t, "target_amt": round(total * t / 100, 2),
+            "diff": round(total * t / 100 - balance, 2),
+            "items": items, "history": history}
+
+
 # --------------------------------------------------------------- 历史与 IRR
 
 @router.get("/history")

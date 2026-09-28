@@ -13,6 +13,7 @@ from app.models.index_daily import IndexDaily
 from app.models.industry_daily import IndustryDaily
 from app.models.margin_daily import MarginDaily
 from app.models.market_sentiment import MarketSentiment
+from app.models.note import Note
 from app.models.pv_rank import PvRank
 from app.models.stock_basic import StockBasic
 from app.models.stock_group import StockGroup, StockGroupMember
@@ -24,4 +25,4 @@ __all__ = ["TradeCal", "DailyBar", "AdjFactor", "StockBasic", "IndexDaily",
            "FundDaily", "FundBasic", "TaskRun", "TaskSchedule", "PvRank",
            "FinaIndicator", "StockGroup", "StockGroupMember", "IndustryDaily",
            "BoardGroup", "BoardMember", "BoardDaily", "FinSnapshot",
-           "FinItem", "FinBalance", "FinTransfer", "FinTarget"]
+           "FinItem", "FinBalance", "FinTransfer", "FinTarget", "Note"]

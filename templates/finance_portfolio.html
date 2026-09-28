@@ -117,68 +117,8 @@
                     {{ fmtYuan(diff(s.sub), true) }}
                   </td>
                   <td class="text-end">
-                    <button class="btn btn-sm btn-link text-muted p-0"
-                            @click="expandSub(s.sub)" title="查看标的明细与年化">明细</button>
-                  </td>
-                </tr>
-                <tr v-if="expandedSub === s.sub" class="detail-row">
-                  <td colspan="8" class="py-2">
-                    <table class="table table-sm mb-0" style="font-size:.78rem">
-                      <thead><tr><th>标的</th><th>类型</th><th>关联代码</th>
-                        <th class="text-end">当前余额</th><th class="text-end">余额日期</th>
-                        <th class="text-end">最新价</th><th class="text-end">年化XIRR</th><th></th></tr></thead>
-                      <tbody>
-                        <tr v-for="i in subItems(s.sub)" :key="i.id">
-                          <td>{{ i.name }}</td>
-                          <td class="text-muted">{{ i.asset_type }}</td>
-                          <td class="text-muted">{{ i.ts_code || '—' }}</td>
-                          <td class="text-end">{{ fmtYuan(i.amount) }}</td>
-                          <td class="text-muted">{{ i.balance_date || '—' }}</td>
-                          <td class="text-end">
-                            <template v-if="i.quote_close != null">
-                              {{ i.quote_close }}
-                              <span :class="(i.quote_pct||0) >= 0 ? 'up' : 'down'">
-                                {{ (i.quote_pct||0) >= 0 ? '+' : '' }}{{ i.quote_pct }}%
-                              </span>
-                            </template>
-                            <span v-else class="text-muted">—</span>
-                          </td>
-                          <td class="text-end" :class="irrCls(irrByItem[i.id])">{{ itemIrr(i.id) }}</td>
-                          <td class="text-end">
-                            <button class="btn btn-sm btn-link text-danger p-0"
-                                    @click="delItem(i)" title="删除标的（含余额与移仓记录）">删</button>
-                          </td>
-                        </tr>
-                        <tr v-if="!subItems(s.sub).length">
-                          <td colspan="8" class="text-muted">该小模块暂无标的</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    <div class="row g-2 align-items-end mt-1">
-                      <div class="col-7 col-lg-4 search-box">
-                        <label class="form-label small text-muted mb-0">关联行情（可选，关键字搜索）</label>
-                        <input class="form-control form-control-sm" v-model="itemForm.query"
-                               placeholder="如 沪深300 / 贵州茅台 / 510300" @input="searchAsset">
-                        <ul class="search-list" v-if="searchResults.length">
-                          <li class="item" v-for="a in searchResults" :key="a.asset_type + a.ts_code"
-                              @click="pickAsset(a)">
-                            <span class="badge text-bg-light me-1" style="font-size:.68rem">{{ a.asset_type }}</span>
-                            {{ a.name }} <span class="text-muted">{{ a.ts_code }}</span>
-                          </li>
-                        </ul>
-                      </div>
-                      <div class="col-5 col-lg-3">
-                        <label class="form-label small text-muted mb-0">标的名称</label>
-                        <input class="form-control form-control-sm" v-model="itemForm.name">
-                      </div>
-                      <div class="col-6 col-lg-2">
-                        <button class="btn btn-sm btn-primary w-100" @click="addItem(s)">添加标的</button>
-                      </div>
-                      <div class="col-12">
-                        <span class="text-muted small" v-if="itemForm.ts_code">已关联行情：{{ itemForm.ts_code }}（{{ itemForm.asset_type }}）</span>
-                        <span class="text-muted small" v-else-if="itemForm.name">未关联行情（将作为纯手动标的，如存款）</span>
-                      </div>
-                    </div>
+                    <a class="btn btn-sm btn-link text-primary p-0"
+                       :href="'/finance/sub?sub=' + encodeURIComponent(s.sub)">详情</a>
                   </td>
                 </tr>
               </template>
@@ -331,6 +271,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/finance_portfolio.js?v=20260928-16"></script>
+  <script src="/static/js/finance_portfolio.js?v=20260928-17"></script>
 </body>
 </html>

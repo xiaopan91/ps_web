@@ -22,3 +22,5 @@ tools/
 .idea/
 .zcode/
 *.bak
+.zcode/
+*.bak

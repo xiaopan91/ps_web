@@ -56,6 +56,7 @@
 
     <main class="container my-3">
       <a class="text-muted small text-decoration-none" href="/finance">← 个人理财</a>
+      <div class="text-danger small mb-2" v-if="errMsg">{{ errMsg }}</div>
       <h5 class="mt-1 mb-3">资产总览与调仓
         <span class="text-muted small fw-normal">标的级持仓 · 目标配置 · 余额法 XIRR</span>
       </h5>
@@ -126,7 +127,7 @@
                     <table class="table table-sm mb-0" style="font-size:.78rem">
                       <thead><tr><th>标的</th><th>类型</th><th>关联代码</th>
                         <th class="text-end">当前余额</th><th class="text-end">余额日期</th>
-                        <th class="text-end">最新价</th><th class="text-end">年化XIRR</th></tr></thead>
+                        <th class="text-end">最新价</th><th class="text-end">年化XIRR</th><th></th></tr></thead>
                       <tbody>
                         <tr v-for="i in subItems(s.sub)" :key="i.id">
                           <td>{{ i.name }}</td>
@@ -144,9 +145,13 @@
                             <span v-else class="text-muted">—</span>
                           </td>
                           <td class="text-end" :class="irrCls(irrByItem[i.id])">{{ itemIrr(i.id) }}</td>
+                          <td class="text-end">
+                            <button class="btn btn-sm btn-link text-danger p-0"
+                                    @click="delItem(i)" title="删除标的（含余额与移仓记录）">删</button>
+                          </td>
                         </tr>
                         <tr v-if="!subItems(s.sub).length">
-                          <td colspan="7" class="text-muted">该小模块暂无标的</td>
+                          <td colspan="8" class="text-muted">该小模块暂无标的</td>
                         </tr>
                       </tbody>
                     </table>
@@ -343,6 +348,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/finance_portfolio.js?v=20260928-13"></script>
+  <script src="/static/js/finance_portfolio.js?v=20260928-14"></script>
 </body>
 </html>

@@ -202,6 +202,15 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (er) { this.errMsg = "删除失败：" + er.message; }
       },
 
+      async delItem(it) {
+        if (!confirm("删除标的「" + it.name + "」？\n其余额记录与移仓记录将一并删除，不可恢复。")) return;
+        try {
+          const r = await fetch("/api/fin/items/" + it.id, { method: "DELETE" });
+          if (!r.ok) throw new Error(await r.text());
+          await this.loadAll();
+        } catch (er) { this.errMsg = "删除标的失败：" + er.message; }
+      },
+
       initChart(id) {
         if (this.charts[id]) return this.charts[id];
         const el = document.getElementById(id);

@@ -185,6 +185,14 @@ document.addEventListener("DOMContentLoaded", function () {
         const url = prompt("链接地址（https://...）");
         if (url) this.exec("createLink", url);
       },
+      // 粘贴一律转纯文本：外部（IDE/网页暗色主题等）带样式粘贴会让文字在
+      // 白底编辑器里"隐形"，且结构混乱
+      onPaste(e) {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData("text/plain") || "";
+        document.execCommand("insertText", false, text);
+        this.dirty = true;
+      },
       async saveNote() {
         if (!this.curId) return;
         const el = this.$refs.editor;

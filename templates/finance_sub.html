@@ -35,6 +35,7 @@
       min-height: 320px; max-height: 560px; overflow-y: auto;
       border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 .375rem .375rem;
       padding: .75rem 1rem; background: #fff; outline: none; font-size: .92rem;
+      white-space: pre-wrap;
     }
     #noteEditor h3 { font-size: 1.15rem; margin: .6rem 0 .3rem; }
     #noteEditor blockquote { border-left: 3px solid #ccc; color: #555; padding-left: .75rem; margin: .5rem 0; }
@@ -226,7 +227,7 @@
               <button class="btn btn-outline-secondary" @click="exec('removeFormat')">清除格式</button>
             </div>
             <div id="noteEditor" contenteditable="true" ref="editor"
-                 @input="dirty = true" v-if="curId"></div>
+                 @input="dirty = true" @paste="onPaste" v-if="curId"></div>
             <div class="text-muted small border rounded p-4 text-center" v-if="!curId">
               点击左侧笔记编辑，或「新建笔记」
             </div>
@@ -243,6 +244,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/finance_sub.js?v=20260928-18"></script>
+  <script src="/static/js/finance_sub.js?v=20260928-19"></script>
 </body>
 </html>

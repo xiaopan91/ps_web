@@ -22,6 +22,10 @@ _DANGER_BLOCK = re.compile(r"<\s*/?\s*(script|style|iframe|object|embed|form|lin
 _ON_ATTR = re.compile(r"\son\w+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", re.IGNORECASE)
 _JS_URL = re.compile(r"(href|src)\s*=\s*(\"|')\s*(javascript|vbscript|data):[^\"']*(\"|')",
                      re.IGNORECASE)
+# 外部粘贴常带暗色主题内联样式（文字浅色，白底编辑器里隐形），统一剥掉
+_STYLE_ATTR = re.compile(r"\s+style\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", re.IGNORECASE)
+_CLASS_ATTR = re.compile(r"\s+class\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", re.IGNORECASE)
+_DATA_ATTR = re.compile(r"\s+data-[\w-]+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", re.IGNORECASE)
 
 
 def sanitize_html(html: str) -> str:
@@ -30,6 +34,9 @@ def sanitize_html(html: str) -> str:
     html = _DANGER_BLOCK.sub("", html)
     html = _ON_ATTR.sub("", html)
     html = _JS_URL.sub(r"\1=\"#\"", html)
+    html = _STYLE_ATTR.sub("", html)
+    html = _CLASS_ATTR.sub("", html)
+    html = _DATA_ATTR.sub("", html)
     return html
 
 

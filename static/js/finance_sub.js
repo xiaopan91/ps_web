@@ -204,13 +204,24 @@ document.addEventListener("DOMContentLoaded", function () {
         return c;
       },
       renderChart() {
+        // 按日期聚合（同日多条记录只留该日最终状态），一天一个点
         const hist = (this.info && this.info.history) || [];
         const sorted = [...hist].sort((a, b) =>
           a.date < b.date ? -1 : a.date > b.date ? 1 : a.item_id - b.item_id);
         const latest = {}; const dates = []; const totals = [];
+        let cur = null;
         for (const b of sorted) {
+          if (b.date !== cur) {
+            if (cur !== null) {
+              dates.push(cur);
+              totals.push(+Object.values(latest).reduce((a, v) => a + v, 0).toFixed(2));
+            }
+            cur = b.date;
+          }
           latest[b.item_id] = +b.amount || 0;
-          dates.push(b.date);
+        }
+        if (cur !== null) {
+          dates.push(cur);
           totals.push(+Object.values(latest).reduce((a, v) => a + v, 0).toFixed(2));
         }
         const c = this.initChart("chart-sub");

@@ -174,13 +174,23 @@ document.addEventListener("DOMContentLoaded", function () {
         return c;
       },
       renderCharts() {
-        // 总资产曲线：按余额记录日期滚动合计（同标的同时点取最新一条）
+        // 总资产曲线：按日期聚合（同日多条记录只留该日最终状态），一天一个点
         const bal = [...(this.hist.balances || [])].sort((a, b) =>
           a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id);
         const latest = {}; const dates = []; const totals = [];
+        let cur = null;
         for (const b of bal) {
+          if (b.date !== cur) {
+            if (cur !== null) {
+              dates.push(cur);
+              totals.push(+Object.values(latest).reduce((a, v) => a + v, 0).toFixed(2));
+            }
+            cur = b.date;
+          }
           latest[b.item_id] = +b.amount || 0;
-          dates.push(b.date);
+        }
+        if (cur !== null) {
+          dates.push(cur);
           totals.push(+Object.values(latest).reduce((a, v) => a + v, 0).toFixed(2));
         }
         const c1 = this.initChart("chart-total");

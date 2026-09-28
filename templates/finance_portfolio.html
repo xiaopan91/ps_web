@@ -11,6 +11,9 @@
     .chart-sm { width: 100%; height: 240px; }
     .up { color: #ef4444; }
     .down { color: #22c55e; }
+    /* bootstrap 表格单元格规则(.table>:not(caption)>*>*)特异性更高会压成黑字，用 td 级选择器加回来 */
+    td.up, td.irr-pos { color: #ef4444; }
+    td.down, td.irr-neg { color: #22c55e; }
     table.pf td, table.pf th { font-size: .84rem; white-space: nowrap; }
     table.hist td, table.hist th { font-size: .82rem; white-space: nowrap; }
     .sticky-head th { position: sticky; top: 0; background: #fff; z-index: 1; }

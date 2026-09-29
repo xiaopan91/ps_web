@@ -70,11 +70,11 @@ document.addEventListener("DOMContentLoaded", function () {
         const d = this.diff(sub);
         return d > 0.005 ? "up" : (d < -0.005 ? "down" : "text-muted");
       },
-      // 偏离百分比：调仓差额 / 目标金额（未设目标时无百分比）
+      // 偏离百分比：调仓差额 / 总资产（总资产为 0 时不显示）
       diffPct(sub) {
-        const t = this.targetAmt(sub);
-        if (!t) return "";
-        return ((this.diff(sub) / t) * 100).toFixed(1) + "%";
+        const total = this.pf.total || 0;
+        if (!total) return "";
+        return (this.diff(sub) / total * 100).toFixed(1) + "%";
       },
 
       itemsOf(sub) { return (this.pf.items || []).filter(i => i.sub === sub); },

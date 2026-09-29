@@ -331,6 +331,7 @@ def sub_detail(sub_name: str):
 
     return {"module": module or "其他", "sub": sub_name,
             "balance": round(balance, 2), "count": len(items),
+            "total": round(total, 2),
             "target_pct": t, "target_amt": round(total * t / 100, 2),
             "diff": round(total * t / 100 - balance, 2),
             "items": items, "history": history}

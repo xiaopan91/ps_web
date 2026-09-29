@@ -131,7 +131,7 @@
                   </td>
                   <td class="text-end">{{ fmtYuan(targetAmt(s.sub)) }}</td>
                   <td class="text-end" :class="diffCls(s.sub)">
-                    {{ fmtYuan(diff(s.sub), true) }}
+                    {{ fmtYuan(diff(s.sub), true) }}{{ diffPct(s.sub) ? '（' + diffPct(s.sub) + '）' : '' }}
                   </td>
                   <td class="text-end">
                     <a class="btn btn-sm btn-link text-primary p-0"
@@ -288,6 +288,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/finance_portfolio.js?v=20260928-19"></script>
+  <script src="/static/js/finance_portfolio.js?v=20260928-20"></script>
 </body>
 </html>

@@ -30,6 +30,11 @@ document.addEventListener("DOMContentLoaded", function () {
         const d = this.info.diff;
         return d > 0.005 ? "up" : (d < -0.005 ? "down" : "text-muted");
       },
+      // 偏离百分比：调仓差额 / 目标金额（未设目标时无百分比）
+      diffPct() {
+        if (!this.info || !this.info.target_amt) return "";
+        return ((this.info.diff / this.info.target_amt) * 100).toFixed(1) + "%";
+      },
     },
 
     methods: {

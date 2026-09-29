@@ -98,7 +98,7 @@
         <div class="col-6 col-lg-3">
           <div class="card"><div class="card-body py-2">
             <div class="text-muted small">调仓差额</div>
-            <div class="fs-6 fw-semibold" :class="diffCls">{{ fmtYuan(info.diff, true) }}</div>
+            <div class="fs-6 fw-semibold" :class="diffCls">{{ fmtYuan(info.diff, true) }}{{ diffPct ? '（' + diffPct + '）' : '' }}</div>
           </div></div>
         </div>
         <div class="col-6 col-lg-3">
@@ -246,6 +246,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/finance_sub.js?v=20260928-19"></script>
+  <script src="/static/js/finance_sub.js?v=20260928-20"></script>
 </body>
 </html>

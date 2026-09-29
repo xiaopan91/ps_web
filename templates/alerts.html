@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>价格报警 · ps_web</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css">
+  <style>
+    .search-box { position: relative; }
+    .search-list {
+      position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
+      background: #fff; border: 1px solid #ddd; border-radius: .375rem;
+      max-height: 300px; overflow-y: auto; box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+      list-style: none; margin: 0; padding: 0;
+    }
+    .search-list .item { padding: .4rem .75rem; cursor: pointer; font-size: .85rem; }
+    .search-list .item:hover { background: #f1f3f5; }
+    .sticky-head th { position: sticky; top: 0; background: #fff; z-index: 1; }
+    table.rules td, table.rules th { font-size: .86rem; white-space: nowrap; vertical-align: middle; }
+    .form-switch .form-check-input { cursor: pointer; }
+    .hist-box { max-height: 420px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <nav class="navbar navbar-dark bg-dark">
+      <div class="container-fluid d-flex align-items-center">
+        <div class="d-flex align-items-center gap-3">
+          <a class="navbar-brand mb-0 h1" href="/">首页</a>
+          <div class="dropdown">
+            <a class="app-nav dropdown-toggle" href="#" role="button"
+               data-bs-toggle="dropdown" aria-expanded="false">市场分析</a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="/stock">个股行情</a></li>
+              <li><a class="dropdown-item" href="/index">指数行情</a></li>
+              <li><a class="dropdown-item" href="/industry">行业观察</a></li>
+              <li><a class="dropdown-item" href="/alerts">价格报警</a></li>
+              <li><a class="dropdown-item" href="/stockpredict">个股预测</a></li>
+              <li><a class="dropdown-item" href="/predict">宏观预测</a></li>
+              <li><a class="dropdown-item" href="/strategy">买卖策略</a></li>
+            </ul>
+          </div>
+          <a class="app-nav" href="/finance">个人理财</a>
+        </div>
+        <a class="app-nav ms-auto" href="/tasks">任务中心</a>
+      </div>
+    </nav>
+
+    <main class="container my-3">
+      <h5 class="mt-1 mb-1">价格报警
+        <span class="text-muted small fw-normal">规则每日评估 · 微信推送 · 站内留痕</span>
+      </h5>
+      <div class="text-muted small mb-3">
+        评估时机：每日行情更新完成后自动评估（也可在
+        <a href="/tasks" class="text-decoration-none">任务中心</a> 手动运行「评估报警规则」或点右侧
+        <a href="#" class="text-decoration-none" @click.prevent="evaluate">立即评估</a>）
+      </div>
+
+      <div class="text-danger small mb-2" v-if="errMsg">{{ errMsg }}</div>
+      <div class="text-success small mb-2" v-if="okMsg">{{ okMsg }}</div>
+
+      <!-- 通知渠道 -->
+      <div class="card mb-3"><div class="card-body">
+        <h6 class="card-title mb-2"><i class="bi bi-wechat me-1"></i>通知渠道 · Server酱
+          <span class="badge text-bg-light ms-1" style="font-size:.7rem">推送到微信</span>
+        </h6>
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-lg-6">
+            <label class="form-label small text-muted mb-0">SendKey</label>
+            <input class="form-control form-control-sm" v-model="config.serverchan_key"
+                   placeholder="SCTxxxx（sct.ftqq.com 微信扫码免费获取）">
+          </div>
+          <div class="col-6 col-lg-2">
+            <button class="btn btn-sm btn-primary w-100" @click="saveConfig">
+              <i class="bi bi-save me-1"></i>保存
+            </button>
+          </div>
+          <div class="col-6 col-lg-2">
+            <button class="btn btn-sm btn-outline-primary w-100" @click="testPush">
+              <i class="bi bi-send me-1"></i>测试发送
+            </button>
+          </div>
+          <div class="col-12 col-lg-2">
+            <button class="btn btn-sm btn-outline-secondary w-100" @click="evaluate">
+              <i class="bi bi-play-fill me-1"></i>立即评估
+            </button>
+          </div>
+        </div>
+        <div class="text-muted small mt-2">
+          免费版每天约 5 条推送，日常报警足够；每日评估结果无论是否推送都会在下方历史留痕。
+        </div>
+      </div></div>
+
+      <!-- 报警规则 -->
+      <div class="card mb-3"><div class="card-body">
+        <h6 class="card-title mb-2"><i class="bi bi-bell me-1"></i>报警规则
+          <span class="text-muted small fw-normal">满足条件时触发，一次性规则触发后自动停用</span>
+        </h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover rules mb-0">
+            <thead><tr><th>标的</th><th>规则</th><th class="text-end">参数</th>
+              <th class="text-center">启停</th><th class="text-center">一次性</th>
+              <th>最近触发</th><th></th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="r in rules" :key="r.id">
+                <td>
+                  <template v-if="editId === r.id">
+                    <input class="form-control form-control-sm" style="width:200px" v-model="f.query"
+                           placeholder="关键字搜索标的" @input="searchAsset">
+                    <ul class="search-list" v-if="searchResults.length">
+                      <li class="item" v-for="a in searchResults" :key="a.asset_type + a.ts_code"
+                          @click="pickAsset(a)">
+                        <span class="badge text-bg-light me-1" style="font-size:.68rem">{{ a.asset_type }}</span>
+                        {{ a.name }} <span class="text-muted">{{ a.ts_code }}</span>
+                      </li>
+                    </ul>
+                  </template>
+                  <template v-else>
+                    {{ r.ts_code }} <span class="text-muted small">{{ typeLabel(r.target_type) }}</span>
+                  </template>
+                </td>
+                <td>
+                  <template v-if="editId === r.id">
+                    <select class="form-select form-select-sm" v-model="f.ruleType" style="width:150px">
+                      <option v-for="t in ruleTypes" :key="t.type" :value="t.type">{{ t.label }}</option>
+                    </select>
+                  </template>
+                  <template v-else>
+                    <span class="badge text-bg-light">{{ ruleLabel(r.rule_type) }}</span>
+                  </template>
+                </td>
+                <td class="text-end">
+                  <template v-if="editId === r.id">
+                    <input v-for="(pf2, idx) in paramFields(f.ruleType)" :key="idx"
+                           type="number" step="any" class="form-control form-control-sm text-end d-inline-block ms-1"
+                           style="width:90px" v-model.number="f.params[pf2.key]" :placeholder="pf2.label">
+                  </template>
+                  <template v-else>{{ paramsText(r) }}</template>
+                </td>
+                <td class="text-center">
+                  <template v-if="editId === r.id">
+                    <div class="form-check form-switch d-inline-block">
+                      <input class="form-check-input" type="checkbox" v-model="f.enabled">
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="form-check form-switch d-inline-block">
+                      <input class="form-check-input" type="checkbox"
+                             :checked="r.enabled" @change="toggleRule(r)">
+                    </div>
+                  </template>
+                </td>
+                <td class="text-center">
+                  <template v-if="editId === r.id">
+                    <div class="form-check form-switch d-inline-block">
+                      <input class="form-check-input" type="checkbox" v-model="f.oneShot">
+                    </div>
+                  </template>
+                  <template v-else>
+                    <i v-if="r.one_shot" class="bi bi-1-circle text-muted" title="触发一次后自动停用"></i>
+                    <span v-else class="text-muted">—</span>
+                  </template>
+                </td>
+                <td class="text-muted small">{{ r.last_triggered_date || '从未' }}</td>
+                <td class="text-end">
+                  <template v-if="editId === r.id">
+                    <button class="btn btn-sm btn-link text-primary p-0 me-1" @click="saveRule(r)"
+                            title="保存"><i class="bi bi-check-lg"></i></button>
+                    <button class="btn btn-sm btn-link text-muted p-0" @click="cancelEdit"
+                            title="取消"><i class="bi bi-x-lg"></i></button>
+                  </template>
+                  <template v-else>
+                    <button class="btn btn-sm btn-link text-primary p-0 me-1" @click="startEdit(r)"
+                            title="编辑"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-link text-danger p-0" @click="delRule(r)"
+                            title="删除规则"><i class="bi bi-trash"></i></button>
+                  </template>
+                </td>
+                <td class="text-muted small" style="max-width:180px;white-space:normal">
+                  {{ r.name || (r.note || '') }}
+                </td>
+              </tr>
+              <tr v-if="!rules.length">
+                <td colspan="9" class="text-muted small text-center py-3">还没有规则，在下方添加第一条</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 添加规则 -->
+        <div class="row g-2 align-items-end mt-2 border-top pt-3">
+          <div class="col-12 col-lg-3 search-box">
+            <label class="form-label small text-muted mb-0">标的</label>
+            <input class="form-control form-control-sm" v-model="f.query"
+                   placeholder="如 沪深300 / 贵州茅台 / 510300" @input="searchAsset">
+            <ul class="search-list" v-if="searchResults.length">
+              <li class="item" v-for="a in searchResults" :key="a.asset_type + a.ts_code"
+                  @click="pickAsset(a)">
+                <span class="badge text-bg-light me-1" style="font-size:.68rem">{{ a.asset_type }}</span>
+                {{ a.name }} <span class="text-muted">{{ a.ts_code }}</span>
+              </li>
+            </ul>
+          </div>
+          <div class="col-6 col-lg-2">
+            <label class="form-label small text-muted mb-0">标的类型</label>
+            <select class="form-select form-select-sm" v-model="f.targetType">
+              <option value="stock">股票</option>
+              <option value="etf">ETF</option>
+              <option value="index">指数</option>
+              <option value="index_ext">主题指数</option>
+            </select>
+          </div>
+          <div class="col-6 col-lg-2">
+            <label class="form-label small text-muted mb-0">标的名称</label>
+            <input class="form-control form-control-sm" v-model="f.name">
+          </div>
+          <div class="col-6 col-lg-2">
+            <label class="form-label small text-muted mb-0">规则</label>
+            <select class="form-select form-select-sm" v-model="f.ruleType">
+              <option v-for="t in ruleTypes" :key="t.type" :value="t.type">{{ t.label }}</option>
+            </select>
+          </div>
+          <div class="col-6 col-lg-2">
+            <label class="form-label small text-muted mb-0">
+              {{ paramFields(f.ruleType).map(p => p.label).join(' / ') || '参数' }}
+            </label>
+            <div class="d-flex">
+              <input v-for="pf2 in paramFields(f.ruleType)" :key="pf2.key"
+                     type="number" step="any" class="form-control form-control-sm text-end me-1"
+                     style="width:80px" v-model.number="f.params[pf2.key]" :placeholder="pf2.label">
+            </div>
+          </div>
+          <div class="col-6 col-lg-1">
+            <button class="btn btn-sm btn-primary w-100" @click="addRule" title="添加规则">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+          <div class="col-12">
+            <div class="form-check form-switch d-inline-block me-3">
+              <input class="form-check-input" type="checkbox" id="newOneShot" v-model="f.oneShot">
+              <label class="form-check-label small text-muted" for="newOneShot">触发一次后自动停用</label>
+            </div>
+            <span class="text-muted small" v-if="f.ts_code">
+              已选：{{ f.name || f.ts_code }}（{{ typeLabel(f.targetType) }} · {{ f.ts_code }}）
+            </span>
+            <span class="text-danger small" v-else>请先搜索并选择标的</span>
+          </div>
+        </div>
+      </div></div>
+
+      <!-- 报警历史 -->
+      <div class="card"><div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="card-title mb-0"><i class="bi bi-clock-history me-1"></i>报警历史</h6>
+          <button class="btn btn-sm btn-outline-secondary" @click="loadAll">
+            <i class="bi bi-arrow-clockwise me-1"></i>刷新
+          </button>
+        </div>
+        <div class="table-responsive hist-box border rounded">
+          <table class="table table-sm table-hover mb-0 sticky-head">
+            <thead><tr><th>触发时间</th><th>数据日期</th><th>标的</th>
+              <th>规则</th><th>内容</th><th class="text-center">微信推送</th></tr></thead>
+            <tbody>
+              <tr v-for="h in history" :key="h.id">
+                <td class="text-muted small">{{ h.created_at }}</td>
+                <td>{{ h.trade_date }}</td>
+                <td>{{ h.ts_code }} <span class="text-muted small">{{ h.name }}</span></td>
+                <td><span class="badge text-bg-light">{{ ruleLabel(h.rule_type) }}</span></td>
+                <td class="small">{{ h.message }}</td>
+                <td class="text-center">
+                  <i v-if="h.notified" class="bi bi-wechat text-success" title="已推送微信"></i>
+                  <i v-else class="bi bi-record-circle text-muted" title="仅站内记录（未配置/推送失败）"></i>
+                </td>
+              </tr>
+              <tr v-if="!history.length">
+                <td colspan="6" class="text-muted small text-center py-3">暂无触发记录</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div></div>
+    </main>
+  </div>
+
+  <script src="/static/vendor/vue/vue.global.prod.js"></script>
+  <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/alerts.js?v=20260929-1"></script>
+</body>
+</html>

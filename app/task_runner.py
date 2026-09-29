@@ -77,12 +77,12 @@ def run_task(task_id, params=None, trigger="manual"):
         _current.update(proc=proc, run_id=run_id, name=task["name"],
                         log_file=str(log_file), started=started)
 
-    threading.Thread(target=_wait_done, args=(proc, run_id, log_file, fh),
+    threading.Thread(target=_wait_done, args=(proc, run_id, log_file, fh, task_id),
                      daemon=True).start()
     return run_id
 
 
-def _wait_done(proc, run_id, log_file, fh):
+def _wait_done(proc, run_id, log_file, fh, task_id=""):
     code = proc.wait()
     fh.close()
     tail = _read_tail(log_file, 50)
@@ -98,6 +98,12 @@ def _wait_done(proc, run_id, log_file, fh):
     run.log_tail = tail
     db.commit()
     db.close()
+    # 每日更新成功后链式评估报警（engine 内按日防重，与定时/手动不重复）
+    if task_id == "update" and code == 0:
+        try:
+            run_task("alert_eval", trigger="schedule")
+        except Exception:
+            pass
 
 
 def _read_tail(log_file, n=50):

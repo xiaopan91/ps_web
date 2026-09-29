@@ -127,6 +127,17 @@ TASKS = [
         ],
         "duration": "秒级", "long": False,
     },
+    {
+        "id": "alert_eval", "name": "评估报警规则",
+        "desc": "按启用的报警规则评估当日行情（价格/涨跌幅/新高新低/均线/放量/PE分位/连涨连跌），触发则写记录并推送到微信",
+        "script": "eval_alerts.py", "args": [],
+        "params": [
+            {"key": "force", "label": "忽略当日防重",
+             "type": "select", "choices": ["否", "是"],
+             "required": False, "flag_map": {"否": "", "是": "--force"}},
+        ],
+        "duration": "秒级", "long": False,
+    },
 ]
 
 TASK_INDEX = {t["id"]: t for t in TASKS}

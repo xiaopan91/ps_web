@@ -133,15 +133,23 @@ def _delete_insert_range(table, df, code):
 # ---------------------------------------------------------------- 基础同步
 
 def sync_basic():
-    """同步在市股票基本信息（整表先删后插）。"""
-    print("[1] 同步股票基本信息 stock_basic ...")
-    df = call_with_retry("stock_basic", func="stock_basic", exchange="",
-                         list_status="L",
-                         fields="ts_code,symbol,name,area,industry,market,list_date")
+    """同步股票基本信息（在市+退市+暂停，整表先删后插）。
+
+    含退市/暂停（D/P）：申万等板块成分含历史成分股，缺了会出「未知股票代码」。
+    """
+    print("[1] 同步股票基本信息 stock_basic（L/D/P 全状态）...")
+    frames = []
+    for st in ("L", "D", "P"):
+        df = call_with_retry(f"stock_basic {st}", func="stock_basic", exchange="",
+                             list_status=st,
+                             fields="ts_code,symbol,name,area,industry,market,list_date")
+        frames.append(df)
+        print(f"    {st}: {len(df)} 只")
+    df = pd.concat(frames, ignore_index=True).drop_duplicates(subset="ts_code")
     df["list_date"] = df["list_date"].map(
         lambda s: pd.to_datetime(s, format="%Y%m%d").date() if s else None)
     n = _delete_insert("stock_basic", df, "1=1", {})
-    print(f"[OK] 共 {n} 只在市股票")
+    print(f"[OK] 共 {n} 只股票（含退市/暂停）")
 
 
 def sync_cal():

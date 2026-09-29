@@ -211,17 +211,105 @@ def sync_index(full=False):
 
 
 
+def sync_finext():
+    """同步理财扩展行情：港股基础信息/全市场日线 + 场外基金净值。
+
+    - hk_basic / hk_daily(trade_date=最近交易日) 各只调 1 次接口（hk_daily 限频 1 次/小时）
+    - 场外基金净值：代码清单自动取自理财标的表（fin_item.asset_type='基金'）
+    - ETF 日线（fund_daily）不在本函数，由 update 链调用 sync_etf
+    """
+    import tushare as ts
+    from app.config import TUSHARE_TOKEN
+    from app.models import FundNav, HkBasic, HkDaily  # noqa: F401 注册 ORM
+    Base.metadata.create_all(engine)
+    pro = ts.pro_api(TUSHARE_TOKEN)
+
+    # ---- 港股基础信息（全量刷新，供搜索选择）----
+    print("[finext] 港股基础信息 hk_basic ...")
+    df = call_with_retry("hk_basic", func="hk_basic", fields="ts_code,name,list_date")
+    df = df.drop_duplicates(subset="ts_code")
+    df["list_date"] = df["list_date"].map(
+        lambda s: pd.to_datetime(s, format="%Y%m%d").date() if s else None)
+    n = _delete_insert("hk_basic", df, "1=1", {})
+    print(f"[OK] hk_basic {n} 只")
+
+    # ---- 港股全市场日线（按交易日；当日未出则回溯最近 5 个自然日）----
+    print("[finext] 港股日线 hk_daily ...")
+    got = None
+    for back in range(5):
+        d = date.today() - timedelta(days=back)
+        try:
+            df = call_with_retry(f"hk_daily {d}", func="hk_daily", trade_date=d.strftime("%Y%m%d"))
+        except Exception as e:
+            print(f"    {d}: 接口异常 {str(e)[:60]}")
+            time.sleep(65)
+            continue
+        if df is not None and len(df):
+            got = (d, df)
+            break
+        time.sleep(1)
+    if got:
+        d, df = got
+        df = df[["ts_code", "trade_date", "open", "high", "low", "close", "change", "pct_change"]]
+        df["trade_date"] = df["trade_date"].map(to_date)
+        for c in ("open", "high", "low", "close", "change", "pct_change"):
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+        n = _delete_insert("hk_daily", df, "trade_date = :d", {"d": d})
+        print(f"[OK] hk_daily {d} 全市场 {n} 行")
+    else:
+        print("[警告] hk_daily 近 5 日无数据")
+
+    # ---- 场外基金净值（代码来自理财标的）----
+    with engine.connect() as conn:
+        codes = [r[0] for r in conn.execute(text(
+            "SELECT DISTINCT ts_code FROM fin_item WHERE asset_type = '基金' AND ts_code IS NOT NULL"))]
+    if not codes:
+        print("[finext] 理财标的中没有场外基金，跳过净值同步")
+        return
+    print(f"[finext] 场外基金净值 {len(codes)} 只 ...")
+    for code in codes:
+        try:
+            df = call_with_retry(f"fund_nav {code}", func="fund_nav", ts_code=code)
+            if df is None or df.empty:
+                print(f"    {code}: 无净值数据")
+                continue
+            df = df[["ts_code", "nav_date", "unit_nav", "accum_nav", "ann_date"]].head(30)
+            df["nav_date"] = df["nav_date"].map(to_date)
+            df["ann_date"] = df["ann_date"].map(
+                lambda s: to_date(s) if s else None)
+            for c in ("unit_nav", "accum_nav"):
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+            _delete_insert("fund_nav", df, "ts_code = :c", {"c": code})
+            latest = df.sort_values("nav_date").iloc[-1]
+            print(f"    {code}: 净值至 {latest['nav_date']}（单位净值 {latest['unit_nav']}）")
+            time.sleep(SLEEP)
+        except Exception as e:
+            print(f"    {code}: 失败 {str(e)[:60]}")
+
+
 def sync_etf(codes=None, full=False):
     """同步 ETF 信息与日线。codes 为空用默认清单；full=True 强制从 2015 全量。
     复权因子写入 adj_factor 表（结构与个股一致、代码空间不冲突，回测统一读取）。"""
-    print("[etf] 同步基金基本信息 fund_basic ...")
-    df = call_with_retry("fund_basic", func="fund_basic", market="E",
-                         fields="ts_code,name,management,fund_type,list_date,market")
+    print("[etf] 同步基金基本信息 fund_basic（场内+场外，场外供理财搜索）...")
+    frames = []
+    for mkt in ("E", "O"):
+        offset, total = 0, 0
+        while True:
+            df = call_with_retry(f"fund_basic {mkt} @{offset}", func="fund_basic",
+                                 market=mkt, limit=10000, offset=offset,
+                                 fields="ts_code,name,management,fund_type,list_date,market")
+            frames.append(df)
+            total += len(df)
+            if len(df) < 10000:
+                break
+            offset += 10000
+        print(f"    market={mkt}: {total} 只")
+    df = pd.concat(frames, ignore_index=True).drop_duplicates(subset="ts_code")
     df = df[["ts_code", "name", "management", "fund_type", "list_date", "market"]]
     df["list_date"] = df["list_date"].map(
         lambda s: pd.to_datetime(s, format="%Y%m%d").date() if s else None)
     n = _delete_insert("fund_basic", df, "1=1", {})
-    print(f"[OK] 共 {n} 只 ETF")
+    print(f"[OK] 共 {n} 只基金（含场外）")
 
     targets = codes if codes else [c for c, _ in DEFAULT_ETFS]
     print(f"[etf] 同步 {len(targets)} 只 ETF 日线（4年分段，自增补差）...")
@@ -252,8 +340,12 @@ def sync_etf(codes=None, full=False):
                 df = df[["ts_code", "trade_date", "open", "high", "low",
                          "close", "vol", "amount"]]
                 df["trade_date"] = df["trade_date"].map(to_date)
-                cnt = _delete_insert_range("fund_daily", df, code)
-                print(f"  {code} fund_daily: +{len(df)} 行（区间内 {cnt}）")
+                df = df.dropna(subset=["trade_date"])
+                if df.empty:
+                    print(f"  {code} fund_daily: {start} 起暂无新数据（当日未出）")
+                else:
+                    cnt = _delete_insert_range("fund_daily", df, code)
+                    print(f"  {code} fund_daily: +{len(df)} 行（区间内 {cnt}）")
 
         # fund_adj → adj_factor 表（区间内重建）
         with engine.connect() as conn:
@@ -279,6 +371,10 @@ def sync_etf(codes=None, full=False):
             df = pd.concat(frames, ignore_index=True)[["ts_code", "trade_date",
                                                        "adj_factor"]]
             df["trade_date"] = df["trade_date"].map(to_date)
+            df = df.dropna(subset=["trade_date"])
+            if df.empty:
+                print(f"  {code} adj_factor: {start} 起暂无新数据（当日未出）")
+                continue
             lo, hi = df["trade_date"].min(), df["trade_date"].max()
             with engine.begin() as conn:
                 conn.execute(text(
@@ -419,6 +515,16 @@ def cmd_update(args):
     recompute_pv_rank()
     recompute_industry()
     recompute_board()
+    try:
+        print("[update] ETF 日线 ...")
+        sync_etf()
+    except Exception as e:
+        print(f"[警告] ETF 同步失败 {str(e)[:80]}")
+    try:
+        print("[update] 理财扩展行情（港股/场外基金）...")
+        sync_finext()
+    except Exception as e:
+        print(f"[警告] 理财扩展行情失败 {str(e)[:80]}")
 
 
 # ---------------------------------------------------------------- 情绪计算
@@ -965,6 +1071,7 @@ def main():
     p_ind.add_argument("--full", action="store_true", help="全量重建（默认增量）")
     with_common(sub.add_parser("board", help="重建板块目录与成分（申万层级 + 主题指数）"))
     with_common(sub.add_parser("index_ext", help="同步主题指数官方日线（增量）"))
+    p_fx = with_common(sub.add_parser("finext", help="理财扩展行情：港股 + 场外基金净值"))
     p_db = with_common(sub.add_parser("dbasic", help="逐日重拉 daily_basic（补 pe_ttm 等新增列）"))
     p_db.add_argument("--start", default="20160101", help="开始日期 YYYYMMDD")
 
@@ -991,6 +1098,8 @@ def main():
         sync_board()
     elif args.cmd == "index_ext":
         sync_index_ext()
+    elif args.cmd == "finext":
+        sync_finext()
     elif args.cmd == "dbasic":
         backfill_dbasic(date(int(args.start[:4]), int(args.start[4:6]), int(args.start[6:8])))
     else:

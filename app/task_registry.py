@@ -128,6 +128,12 @@ TASKS = [
         "duration": "秒级", "long": False,
     },
     {
+        "id": "finext", "name": "理财扩展行情同步",
+        "desc": "港股基础信息/全市场日线（hk_daily 限频 1 次/小时，按交易日一次拉全）+ 理财标的中的场外基金净值；ETF 日线由「每日增量更新」附带",
+        "script": "sync_data.py", "args": ["finext"],
+        "params": [], "duration": "约1-3分钟", "long": False,
+    },
+    {
         "id": "alert_eval", "name": "评估报警规则",
         "desc": "按启用的报警规则评估当日行情（价格/涨跌幅/新高新低/均线/放量/PE分位/连涨连跌），触发则写记录并推送到微信",
         "script": "eval_alerts.py", "args": [],

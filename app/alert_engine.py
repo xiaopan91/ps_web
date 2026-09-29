@@ -18,8 +18,7 @@ from sqlalchemy import text
 from app.database import engine
 
 # 标的类型 → 行情表（四表统一，列对齐：close/vol/amount）
-TABLES = {"stock": "daily_bar", "etf": "fund_daily",
-          "index": "index_daily", "index_ext": "index_ext"}
+TABLES = {"stock": "daily_bar", "etf": "fund_daily", "index": "index_daily"}
 
 RULE_LABELS = {
     "price_above": "价格高于", "price_below": "价格低于",

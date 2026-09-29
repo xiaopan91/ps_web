@@ -46,11 +46,17 @@ def search_asset(q: str):
     out += [{"asset_type": "股票", "ts_code": r.ts_code, "name": r.name}
             for r in stk.itertuples()]
     fnd = pd.read_sql(text(
-        "SELECT ts_code, name FROM fund_basic "
+        "SELECT ts_code, name, market FROM fund_basic "
         "WHERE name LIKE :p OR ts_code LIKE :p ORDER BY ts_code LIMIT 8"),
         engine, params={"p": like})
-    out += [{"asset_type": "ETF", "ts_code": r.ts_code, "name": r.name}
-            for r in fnd.itertuples()]
+    out += [{"asset_type": "ETF" if r.market == "E" else "基金",
+             "ts_code": r.ts_code, "name": r.name} for r in fnd.itertuples()]
+    hk = pd.read_sql(text(
+        "SELECT ts_code, name FROM hk_basic "
+        "WHERE name LIKE :p OR ts_code LIKE :p ORDER BY ts_code LIMIT 8"),
+        engine, params={"p": like})
+    out += [{"asset_type": "港股", "ts_code": r.ts_code, "name": r.name}
+            for r in hk.itertuples()]
     for code, name in INDEX_ALL.items():
         if q.strip() in code or q.strip() in name:
             out.append({"asset_type": "指数", "ts_code": code, "name": name})
@@ -76,22 +82,27 @@ def _items_full() -> list[dict]:
         "SELECT id, module, sub, name, asset_type, ts_code, note FROM fin_item "
         "ORDER BY module, sub, id"), engine)
     bal = _latest_balances()
-    # 最新行情快照（股票= daily_bar；ETF= fund_daily；指数= index_daily）
-    # fund_daily 无 pct_chg 列，统一取最近两日收盘价算涨跌
+    # 最新行情快照（股票= daily_bar；ETF= fund_daily；指数= index_daily；
+    # 港股= hk_daily；基金= fund_nav 单位净值，净值日期一般 T+1）
+    # 统一取最近两期「价格」手算涨跌（fund_daily/hk_daily 无 pct_chg 或不依赖）
     quotes = {}
-    for table, typ in (("daily_bar", "股票"), ("fund_daily", "ETF"), ("index_daily", "指数")):
+    for table, typ, date_col, price_col in (
+            ("daily_bar", "股票", "trade_date", "close"), ("fund_daily", "ETF", "trade_date", "close"),
+            ("index_daily", "指数", "trade_date", "close"),
+            ("hk_daily", "港股", "trade_date", "close"), ("fund_nav", "基金", "nav_date", "unit_nav")):
         q = pd.read_sql(text(
-            f"SELECT ts_code, trade_date, close FROM {table} "
-            f"WHERE trade_date IN (SELECT trade_date FROM ("
-            f"SELECT DISTINCT trade_date FROM {table} ORDER BY trade_date DESC LIMIT 2) x)"), engine)
+            f"SELECT ts_code, {date_col} AS trade_date, {price_col} AS close FROM {table} "
+            f"WHERE {date_col} IN (SELECT {date_col} FROM ("
+            f"SELECT DISTINCT {date_col} FROM {table} ORDER BY {date_col} DESC LIMIT 2) x)"), engine)
         q["close"] = pd.to_numeric(q["close"], errors="coerce")
         if q.empty:
             continue
-        q = q.sort_values("trade_date")
-        last = q.groupby("ts_code")["close"].last()
-        prev = q.groupby("ts_code")["close"].nth(-2)
+        piv = q.pivot_table(index="ts_code", columns="trade_date",
+                            values="close", aggfunc="last")
+        last = piv[piv.columns[-1]]
+        prev_s = piv[piv.columns[-2]] if len(piv.columns) > 1 else pd.Series(dtype=float)
         for ts, close in last.items():
-            p = prev.get(ts)
+            p = prev_s.get(ts)
             pct = (float(close) / float(p) - 1) * 100 if pd.notna(p) and float(p) != 0 else None
             quotes[(typ, ts)] = (float(close), None if pct is None else round(pct, 2))
     out = []

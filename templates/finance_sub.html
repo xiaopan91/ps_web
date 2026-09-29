@@ -76,7 +76,7 @@
       <h5 class="mt-1 mb-3">
         <span class="badge text-bg-light module-chip me-1">{{ info.module }}</span>
         {{ info.sub }}
-        <span class="text-muted small fw-normal">小模块详情</span>
+        
       </h5>
 
       <div class="text-danger small mb-2" v-if="errMsg">{{ errMsg }}</div>
@@ -185,14 +185,17 @@
 
       <!-- 余额曲线 -->
       <div class="card mb-3"><div class="card-body">
-        <h6 class="card-title small text-muted mb-1">小模块余额曲线（按余额记录日期）</h6>
+        <h6 class="card-title small text-muted mb-1">小模块余额曲线<i class="bi bi-info-circle info-icon ms-1"
+                        data-tip="按余额记录日期滚动合计；同日多条记录取当日终态，一天一个点"></i></h6>
         <div id="chart-sub" class="chart"></div>
       </div></div>
 
       <!-- 笔记 -->
       <div class="card mb-3"><div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h6 class="card-title mb-0">笔记 <span class="text-muted small fw-normal">想法与记录（支持超文本）</span></h6>
+          <h6 class="card-title mb-0">笔记
+          <i class="bi bi-info-circle info-icon ms-1"
+             data-tip="记录想法与观点；支持超文本：加粗/标题/列表/引用/代码/链接，粘贴自动转纯文本"></i></h6>
           <button class="btn btn-sm btn-outline-primary" @click="newNote" title="新建笔记"><i class="bi bi-plus-lg"></i></button>
         </div>
         <div class="row g-3">

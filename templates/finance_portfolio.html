@@ -63,7 +63,7 @@
       <a class="text-muted small text-decoration-none" href="/finance">← 个人理财</a>
       <div class="text-danger small mb-2" v-if="errMsg">{{ errMsg }}</div>
       <h5 class="mt-1 mb-3">资产总览与调仓
-        <span class="text-muted small fw-normal">标的级持仓 · 目标配置 · 余额法 XIRR</span>
+        
       </h5>
 
       <!-- 总览条 -->
@@ -89,7 +89,8 @@
           <h6 class="card-title mb-0">调仓目标（小模块级）</h6>
           <span class="text-muted small">
             目标合计 <b :class="targetsSum === 100 ? 'text-success' : 'text-danger'">{{ targetsSum }}%</b>
-            <span v-if="targetsSum !== 100">（≠100%，调仓差额按比例仍可参考）</span>
+            <i v-if="targetsSum !== 100" class="bi bi-info-circle info-icon ms-1"
+                     data-tip="目标合计 ≠ 100% 时，调仓差额仍按比例计算，仅供参考"></i>
           </span>
         </div>
         <div class="table-responsive">
@@ -214,7 +215,8 @@
       <!-- 总资产曲线 + 配置对比 -->
       <div class="row g-3 mb-3">
         <div class="col-12 col-lg-6"><div class="card"><div class="card-body">
-          <h6 class="card-title small text-muted mb-1">总资产曲线（按余额记录日期）</h6>
+          <h6 class="card-title small text-muted mb-1">总资产曲线<i class="bi bi-info-circle info-icon ms-1"
+                          data-tip="按余额记录日期滚动合计；同日多条记录取当日终态，一天一个点"></i></h6>
           <div id="chart-total" class="chart"></div>
         </div></div></div>
         <div class="col-12 col-lg-6"><div class="card"><div class="card-body">
@@ -226,8 +228,10 @@
       <!-- IRR 表 -->
       <div class="card mb-3"><div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h6 class="card-title mb-0">年化收益率（余额法 XIRR 近似）</h6>
-          <span class="text-muted small" style="font-size:.7rem">口径：外部现金流 = 余额增量 − 移仓净转入；市场盈亏与投入混算，近似值</span>
+          <h6 class="card-title mb-0">年化收益率（余额法 XIRR 近似）
+            <i class="bi bi-info-circle info-icon ms-1"
+               data-tip="口径：外部现金流 = 余额增量 − 移仓净转入；市场盈亏与投入混算，为近似估算"></i></h6>
+          
         </div>
         <table class="table table-sm mb-0" style="font-size:.84rem">
           <thead><tr><th>范围</th><th>名称</th><th class="text-end">年化 XIRR</th></tr></thead>

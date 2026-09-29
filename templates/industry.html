@@ -74,7 +74,8 @@
       <div class="card mb-3" v-if="summary && summary.heat && summary.heat.length">
         <div class="card-body py-2">
           <h6 class="card-title small text-muted mb-2">
-            今日热度榜（涨幅前 {{ summary.hot_n }} 上榜 · <i class="bi bi-fire"></i> = 连续在榜天数 · [新] = 今日新上榜）
+            今日热度榜<i class="bi bi-info-circle info-icon ms-1"
+                    data-tip="涨幅前 {{ summary.hot_n }} 上榜；火图标n = 连续 n 天在榜（热度持续性）；[新] = 今日首次上榜"></i>
           </h6>
           <div class="d-flex flex-wrap gap-2">
             <a v-for="(h, idx) in summary.heat" :key="h.code" href="#"
@@ -142,15 +143,7 @@
             </tbody>
           </table>
         </div>
-        <div class="text-muted small mt-2">
-          口径：申万板块（L1/L2/L3，成分取自 index_member_all 当前成分）的收益为成分股等权/流通市值加权
-          自建聚合；主题指数（23 个中证/国证预置清单）的涨幅直接取官方指数日线，成分=最新月末快照
-          （历史成分变动未回溯，属近似）；涨幅按净值折算，全市场等权基准由申万二级家数加权合成。
-          成交占比为板块成交额占全市场比，变化为 20 日差（pp）。
-          热度口径：按当日等权涨幅在同类板块中排名，进入前 {{ summary?.hot_n || 10 }} 记为上榜
-          （板块数少的类型自适应下调上榜线）；<i class="bi bi-fire"></i>n = 连续 n 天在榜（热度持续性），
-          [新] = 今日首次上榜（新热点萌芽）；上榜线内排名即「今日名次」。
-        </div>
+        <div class="text-muted small mt-2">数据口径 <i class="bi bi-info-circle info-icon" data-tip="口径：申万板块（L1/L2/L3）收益为成分股等权/流通市值加权自建聚合；主题指数（23 个预置清单）涨幅直接取官方指数日线，成分=最新月末快照（历史成分变动未回溯，属近似）；涨幅按净值折算，全市场等权基准由申万二级家数加权合成。成交占比 = 板块成交额占全市场比，变化为 20 日差（pp）。热度：按当日等权涨幅在同类板块中排名，进入前 N 记为上榜（板块数少的类型自适应下调）；火n = 连续 n 天在榜；[新] = 今日首次上榜；上榜线内排名即「今日名次」"></i></div>
       </div></div>
     </main>
   </div>

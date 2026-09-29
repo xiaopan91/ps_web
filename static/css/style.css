@@ -93,3 +93,24 @@
   color: #fff;
   background: rgba(255, 255, 255, 0.12);
 }
+
+/* 信息提示：悬停显示解释性文字（替代页面上的说明段落） */
+.info-tip { position: relative; cursor: help; border-bottom: 1px dotted #94a3b8; }
+.info-tip:hover::after {
+  content: attr(data-tip);
+  position: absolute; left: 0; top: calc(100% + 4px); z-index: 30;
+  background: #1e293b; color: #f1f5f9;
+  font-size: .72rem; line-height: 1.5; white-space: normal;
+  padding: .45rem .65rem; border-radius: .375rem;
+  width: 260px; text-align: left;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+}
+.info-icon { cursor: help; color: #94a3b8; font-size: .85rem; position: relative; }
+.info-icon:hover::after {
+  content: attr(data-tip);
+  position: absolute; left: 10px; top: calc(100% + 2px); z-index: 1050;
+  background: #1e293b; color: #f1f5f9;
+  font-size: .72rem; line-height: 1.5; white-space: normal; width: 280px;
+  padding: .45rem .65rem; border-radius: .375rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+}

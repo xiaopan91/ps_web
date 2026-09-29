@@ -166,6 +166,50 @@ const app = createApp({
     watch(favOpen, open => { if (open) loadFavPanel(); });
     watch(code, () => { if (favPopOpen.value) loadFavPop(); });
 
+    // ---------------- 个股标签 ----------------
+    const tags = ref([]);
+    const allTags = ref([]);
+    const tagPopOpen = ref(false);
+    const newTagName = ref("");
+    const tagErr = ref("");
+
+    async function loadTags() {
+      try { allTags.value = await (await fetch("/api/tags")).json(); } catch (e) { /* 忽略 */ }
+    }
+    async function loadStockTags() {
+      try { tags.value = await (await fetch(`/api/tags/stock/${code.value}`)).json(); } catch (e) { /* 忽略 */ }
+    }
+    function hasTag(t) { return tags.value.some(x => x.id === t.id); }
+    async function addTag() {
+      const name = (newTagName.value || "").trim();
+      if (!name) { tagErr.value = "请输入标签名"; return; }
+      tagErr.value = "";
+      try {
+        const r = await fetch(`/api/tags/stock/${code.value}`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        if (!r.ok) throw new Error((await r.text()).slice(0, 80));
+        newTagName.value = "";
+        await Promise.all([loadStockTags(), loadTags()]);
+      } catch (e) { tagErr.value = "打标失败：" + e.message; }
+    }
+    async function removeTag(t) {
+      tagErr.value = "";
+      try {
+        await fetch(`/api/tags/stock/${code.value}/${t.id}`, { method: "DELETE" });
+        await Promise.all([loadStockTags(), loadTags()]);
+      } catch (e) { tagErr.value = "摘除失败"; }
+    }
+    async function quickToggle(t) {
+      if (hasTag(t)) await removeTag(t);
+      else { newTagName.value = t.name; await addTag(); }
+    }
+    watch(code, () => { if (tagPopOpen.value) loadStockTags(); });
+    watch(tagPopOpen, open => {
+      if (open) { newTagName.value = ""; tagErr.value = ""; loadTags(); loadStockTags(); }
+    });
+
     let chart = null;
     let barsCache = [];
 
@@ -638,6 +682,13 @@ const app = createApp({
     onMounted(() => {
       load();
       loadFavPop();   // 星标初始状态
+      loadStockTags();   // 标签初始状态
+      document.addEventListener("click", (e) => {
+        if (!tagPopOpen.value) return;
+        const t = e.target;
+        if (t.closest && (t.closest(".fav-pop") || t.closest('[title="打标签"]'))) return;
+        tagPopOpen.value = false;
+      });
       document.addEventListener("click", (e) => {
         if (!favPopOpen.value) return;
         const t = e.target;
@@ -657,7 +708,9 @@ const app = createApp({
              dcf, dcfLoading, dcfP, loadDcf, cellBg,
              favOpen, favData, favPopOpen, favGroups, favErr, newGroupName,
              starred, toggleFavPop, toggleGroup, createGroupAndJoin,
-             renameGroup, removeGroup, pickFav };
+             renameGroup, removeGroup, pickFav,
+             tags, allTags, tagPopOpen, newTagName, tagErr,
+             addTag, removeTag, quickToggle, hasTag };
   },
 });
 

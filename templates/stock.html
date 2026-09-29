@@ -24,6 +24,10 @@
     .stat-card .card-body { padding: .5rem .75rem; }
     .stat-card .stat-value { font-size: 1.05rem; font-weight: 600; }
     .stat-card .stat-sub { font-size: .72rem; }
+    .stock-tag { background: #eef5ff; color: #1d4ed8; font-weight: 400;
+                 display: inline-flex; align-items: center; }
+    .stock-tag .tag-x { font-size: .62rem; margin-left: .3rem; cursor: pointer; opacity: .55; }
+    .stock-tag .tag-x:hover { opacity: 1; }
     .fav-pop {
       position: absolute; top: 100%; right: 0; z-index: 20; min-width: 230px;
       background: #fff; border: 1px solid #ddd; border-radius: .375rem;
@@ -85,6 +89,41 @@
           <h5 class="mb-0">{{ info.name }} <span class="text-muted fs-6">{{ info.ts_code }}</span></h5>
           <span class="badge bg-secondary" v-if="info.industry">{{ info.industry }}</span>
           <span class="badge bg-light text-dark" v-if="info.market">{{ info.market }}</span>
+          <!-- 标签 -->
+          <span class="ms-1" v-for="t in tags" :key="t.id">
+            <span class="badge stock-tag">
+              <i class="bi bi-tag me-1"></i>{{ t.name }}
+              <i class="bi bi-x-lg tag-x" @click.stop="removeTag(t)" title="摘除标签"></i>
+            </span>
+          </span>
+          <span class="position-relative ms-1" v-if="info">
+            <button class="btn btn-sm btn-outline-secondary py-0" title="打标签"
+                    @click.stop="tagPopOpen = !tagPopOpen">
+              <i class="bi bi-tag"></i><i class="bi bi-plus-lg"></i>
+            </button>
+            <div class="fav-pop" style="min-width:260px" v-if="tagPopOpen" @click.stop>
+              <div class="p-2 border-bottom d-flex gap-1">
+                <input class="form-control form-control-sm" v-model="newTagName" list="allTagList"
+                       placeholder="新标签名或从下方选" @keydown.enter.prevent="addTag">
+                <button class="btn btn-sm btn-primary text-nowrap" @click="addTag">
+                  <i class="bi bi-plus-lg"></i>
+                </button>
+              </div>
+              <div style="max-height:240px;overflow-y:auto">
+                <label class="fav-item" v-for="t in allTags" :key="t.id"
+                       @click.stop="quickToggle(t)">
+                  <i class="bi" :class="hasTag(t) ? 'bi-check2-square text-primary' : 'bi-square'"></i>
+                  <span>{{ t.name }}</span>
+                  <span class="text-muted ms-auto" style="font-size:.72rem">{{ t.count }}</span>
+                </label>
+                <div v-if="!allTags.length" class="text-muted small p-2">还没有标签，输入名称创建第一个</div>
+              </div>
+              <div class="text-danger small px-2 pb-1" v-if="tagErr">{{ tagErr }}</div>
+              <datalist id="allTagList">
+                <option v-for="t in allTags" :key="t.id" :value="t.name"></option>
+              </datalist>
+            </div>
+          </span>
         </template>
 
         <template v-if="latest">

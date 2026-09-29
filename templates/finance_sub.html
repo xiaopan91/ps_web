@@ -133,9 +133,42 @@
               <th class="text-end">最新价</th><th class="text-end">年化XIRR</th><th></th></tr></thead>
             <tbody>
               <tr v-for="i in info.items" :key="i.id">
-                <td>{{ i.name }}</td>
-                <td class="text-muted">{{ i.asset_type }}</td>
-                <td class="text-muted">{{ i.ts_code || '—' }}</td>
+                <td>
+                  <template v-if="editItemId === i.id">
+                    <input class="form-control form-control-sm" style="width:150px"
+                           v-model="editItem.name">
+                  </template>
+                  <template v-else>{{ i.name }}</template>
+                </td>
+                <td class="text-muted">
+                  <template v-if="editItemId === i.id">
+                    <select class="form-select form-select-sm" v-model="editItem.asset_type" style="width:90px">
+                      <option v-for="t in assetTypes" :key="t" :value="t">{{ t }}</option>
+                    </select>
+                  </template>
+                  <template v-else>{{ i.asset_type }}</template>
+                </td>
+                <td class="text-muted">
+                  <template v-if="editItemId === i.id">
+                    <div class="search-box d-inline-block" style="min-width:200px">
+                      <input class="form-control form-control-sm" v-model="editItem.query"
+                             placeholder="关键字搜索行情" @input="searchEdit">
+                      <ul class="search-list" v-if="editResults.length">
+                        <li class="item" v-for="a in editResults" :key="a.asset_type + a.ts_code"
+                            @click="pickEdit(a)">
+                          <span class="badge text-bg-light me-1" style="font-size:.68rem">{{ a.asset_type }}</span>
+                          {{ a.name }} <span class="text-muted">{{ a.ts_code }}</span>
+                        </li>
+                      </ul>
+                    </div>
+                    <div class="small mt-1">
+                      <span class="text-muted">{{ editItem.ts_code || '未关联' }}</span>
+                      <button class="btn btn-sm btn-link text-muted p-0 ms-1" v-if="editItem.ts_code"
+                              @click="editItem.ts_code = ''; editItem.asset_type = '其他'" title="清除关联">清除</button>
+                    </div>
+                  </template>
+                  <template v-else>{{ i.ts_code || '—' }}</template>
+                </td>
                 <td class="text-end" @dblclick="startBalEdit(i)" title="双击修改余额（确认后直接录入，单位：元）">
                   <template v-if="balEditId === i.id">
                     <input type="number" step="0.01" class="form-control form-control-sm text-end d-inline-block"
@@ -157,7 +190,15 @@
                   <span v-else class="text-muted">—</span>
                 </td>
                 <td class="text-end" :class="irrCls(i.xirr)">{{ fx(i.xirr, '%') }}</td>
-                <td class="text-end">
+                <td class="text-end text-nowrap">
+                  <template v-if="editItemId === i.id">
+                    <button class="btn btn-sm btn-link text-primary p-0 me-1" @click="saveItemEdit(i)"
+                            title="保存"><i class="bi bi-check-lg"></i></button>
+                    <button class="btn btn-sm btn-link text-muted p-0 me-1" @click="cancelItemEdit"
+                            title="取消"><i class="bi bi-x-lg"></i></button>
+                  </template>
+                  <button class="btn btn-sm btn-link text-primary p-0 me-1" v-if="editItemId !== i.id"
+                          @click="startItemEdit(i)" title="重新关联行情 / 改名"><i class="bi bi-link-45deg"></i></button>
                   <button class="btn btn-sm btn-link text-danger p-0"
                           @click="delItem(i)" title="删除标的（含余额与移仓记录）"><i class="bi bi-trash"></i></button>
                 </td>
@@ -261,6 +302,6 @@
   <script src="/static/vendor/vue/vue.global.prod.js"></script>
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/echarts/echarts.min.js"></script>
-  <script src="/static/js/finance_sub.js?v=20260928-21"></script>
+  <script src="/static/js/finance_sub.js?v=20260928-22"></script>
 </body>
 </html>

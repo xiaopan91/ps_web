@@ -16,6 +16,11 @@ document.addEventListener("DOMContentLoaded", function () {
         searchResults: [],
         balEditId: null,   // 双击改余额：当前编辑的标的
         balEditVal: null,  // 双击改余额：输入的金额（元）
+        editItemId: null,  // 重新关联/改名：当前编辑的标的
+        editItem: { name: "", asset_type: "其他", ts_code: "", query: "" },
+        editResults: [],
+        assetTypes: ["股票", "ETF", "指数", "港股", "基金", "其他"],
+        _editTimer: null,
         charts: {},
         errMsg: "",
         infoErr: "",
@@ -126,6 +131,47 @@ document.addEventListener("DOMContentLoaded", function () {
           await this.loadInfo();
         } catch (e) { this.errMsg = "添加标的失败：" + e.message; }
       },
+      // ---------------- 重新关联 / 改名 ----------------
+      searchEdit() {
+        clearTimeout(this._editTimer);
+        const q = (this.editItem.query || "").trim();
+        if (!q) { this.editResults = []; return; }
+        this._editTimer = setTimeout(async () => {
+          try {
+            const r = await fetch("/api/fin/search_asset?q=" + encodeURIComponent(q));
+            this.editResults = r.ok ? await r.json() : [];
+          } catch (e) { this.editResults = []; }
+        }, 250);
+      },
+      pickEdit(a) {
+        this.editItem.ts_code = a.ts_code;
+        this.editItem.asset_type = a.asset_type;
+        this.editItem.name = a.name;
+        this.editItem.query = "";
+        this.editResults = [];
+      },
+      startItemEdit(i) {
+        this.editItemId = i.id;
+        this.editItem = { name: i.name, asset_type: i.asset_type,
+                          ts_code: i.ts_code || "", query: "" };
+        this.editResults = [];
+      },
+      cancelItemEdit() { this.editItemId = null; this.editResults = []; },
+      async saveItemEdit(i) {
+        const e = this.editItem;
+        if (!e.name.trim()) { this.errMsg = "名称不能为空"; return; }
+        try {
+          const r = await fetch("/api/fin/items/" + i.id, {
+            method: "PUT", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: e.name.trim(), asset_type: e.asset_type,
+                                   ts_code: e.ts_code || null }),
+          });
+          if (!r.ok) throw new Error(await r.text());
+          this.cancelItemEdit();
+          await this.loadInfo();
+        } catch (er) { this.errMsg = "保存失败：" + er.message; }
+      },
+
       async delItem(it) {
         if (!confirm("删除标的「" + it.name + "」？\n其余额记录与移仓记录将一并删除，不可恢复。")) return;
         try {

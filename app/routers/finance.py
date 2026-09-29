@@ -150,6 +150,29 @@ def add_item(body: ItemIn):
     return {"ok": True}
 
 
+class ItemUpdate(BaseModel):
+    """标的更新：名称与行情关联（大/小模块归属不变）。"""
+    name: str
+    asset_type: str = "其他"
+    ts_code: str | None = None
+
+
+@router.put("/items/{item_id}")
+def update_item(item_id: int, body: ItemUpdate):
+    from app.models.finance import ASSET_TYPES
+    if body.asset_type not in ASSET_TYPES:
+        raise HTTPException(400, f"asset_type 须为 {ASSET_TYPES}")
+    with engine.begin() as conn:
+        n = conn.execute(text(
+            "UPDATE fin_item SET name = :n, asset_type = :t, ts_code = :c WHERE id = :i"),
+            {"n": body.name.strip(), "t": body.asset_type,
+             "c": body.ts_code.strip() or None if body.ts_code else None,
+             "i": item_id}).rowcount
+    if not n:
+        raise HTTPException(404, "标的不存在")
+    return {"ok": True}
+
+
 @router.delete("/items/{item_id}")
 def del_item(item_id: int):
     with engine.begin() as conn:

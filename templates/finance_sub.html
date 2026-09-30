@@ -95,25 +95,32 @@
 
       <!-- 概览条 -->
       <div class="row g-2 mb-3">
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg">
           <div class="card"><div class="card-body py-2">
             <div class="text-muted small">当前余额</div>
             <div class="fs-5 fw-bold">{{ fmtW(info.balance) }}</div>
           </div></div>
         </div>
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg">
+          <div class="card"><div class="card-body py-2">
+            <div class="text-muted small">年化XIRR
+              <i class="bi bi-info-circle info-icon" data-tip="余额法近似：外部现金流 = 余额增量 − 移仓净转入；小模块内全部标的合并计算"></i></div>
+            <div class="fs-6 fw-semibold" :class="irrCls(info.xirr)">{{ fx(info.xirr, '%') }}</div>
+          </div></div>
+        </div>
+        <div class="col-6 col-lg">
           <div class="card"><div class="card-body py-2">
             <div class="text-muted small">目标比例</div>
             <div class="fs-6 fw-semibold">{{ info.target_pct }}%（{{ fmtW(info.target_amt) }}）</div>
           </div></div>
         </div>
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg">
           <div class="card"><div class="card-body py-2">
             <div class="text-muted small">调仓差额</div>
             <div class="fs-6 fw-semibold" :class="diffCls">{{ fmtYuan(info.diff, true) }}{{ diffPct ? '（' + diffPct + '）' : '' }}</div>
           </div></div>
         </div>
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg">
           <div class="card"><div class="card-body py-2">
             <div class="text-muted small">标的数</div>
             <div class="fs-6 fw-semibold">{{ info.count }}</div>

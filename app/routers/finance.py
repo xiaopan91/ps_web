@@ -349,9 +349,11 @@ def sub_detail(sub_name: str):
     total = sum(i["amount"] or 0 for i in all_items)
     balance = sum(i["amount"] or 0 for i in items)
     t = targets.get(sub_name, 0.0)
-    xirr_map = {x["item_id"]: x["xirr"] for x in irr()["items"]}
+    irr_all = irr()
+    xirr_map = {x["item_id"]: x["xirr"] for x in irr_all["items"]}
     for i in items:
         i["xirr"] = xirr_map.get(i["id"])
+    sub_xirr = next((x["xirr"] for x in irr_all["subs"] if x["sub"] == sub_name), None)
 
     hist = pd.read_sql(text(
         "SELECT b.item_id, i.name, b.date, b.amount FROM fin_balance b "
@@ -362,7 +364,7 @@ def sub_detail(sub_name: str):
 
     return {"module": module or "其他", "sub": sub_name,
             "balance": round(balance, 2), "count": len(items),
-            "total": round(total, 2),
+            "total": round(total, 2), "xirr": sub_xirr,
             "target_pct": t, "target_amt": round(total * t / 100, 2),
             "diff": round(total * t / 100 - balance, 2),
             "items": items, "history": history}

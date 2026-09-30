@@ -251,10 +251,6 @@ def add_transfer(body: TransferIn):
         raise HTTPException(400, "移仓双方不能是同一标的")
     if body.amount <= 0:
         raise HTTPException(400, "移仓金额必须大于 0")
-    bal = _latest_balances()
-    src = bal.get(body.from_item, {}).get("amount", 0.0)
-    if body.amount > src:
-        raise HTTPException(400, f"转出金额超过转出标的当前余额（{src:.2f}）")
     d = _parse_d(body.date)
     with engine.begin() as conn:
         conn.execute(text(

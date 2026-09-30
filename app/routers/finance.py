@@ -252,6 +252,7 @@ def add_transfer(body: TransferIn):
     if body.amount <= 0:
         raise HTTPException(400, "移仓金额必须大于 0")
     d = _parse_d(body.date)
+    bal = _latest_balances()
     with engine.begin() as conn:
         conn.execute(text(
             "INSERT INTO fin_transfer (date, from_item, to_item, amount, note, created_at) "
